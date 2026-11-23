@@ -45,6 +45,7 @@ void save_editor_draw(float scale);  // save_editor.mm
 extern "C" int game_in_play(void);  // hle/warp.c
 void save_editor_on_open(void);
 void d3_season_mark_dirty(void);  // <--- 加在这里
+void d3_cheats_tab_draw(float scale);
 void rando_tab_draw(float scale);
 bool warp_tab_draw(float scale);  // warp_tab.mm: true when a warp started
 extern "C" void cheats_draw(float scale);  // cheats.mm
@@ -618,6 +619,19 @@ static void fonts_add(float density) {
             b.FontDataOwnedByAtlas = false;
             g_menu_font = io.Fonts->AddFontFromMemoryTTF(g_body, (int)g_body_n, 31, &b);
             g_menu_font_desc = io.Fonts->AddFontFromMemoryTTF(g_body, (int)g_body_n, 29, &b);
+        }
+    }
+    if (g_menu_font) {
+        ImFontConfig zh = cfg;
+        zh.MergeMode = true;
+        const char *zh_paths[] = {"C:/Windows/Fonts/msyh.ttc", "C:/Windows/Fonts/simhei.ttf",
+                                  "/System/Library/Fonts/PingFang.ttc"};
+        for (const char *zp : zh_paths) {
+            if (FILE *zf = fopen(zp, "rb")) {
+                fclose(zf);
+                io.Fonts->AddFontFromFileTTF(zp, 31, &zh, io.Fonts->GetGlyphRangesChineseFull());
+                break;
+            }
         }
     }
     if (!g_menu_font || !g_menu_font_big) g_menu_font = g_font, g_menu_font_big = g_font_big;
@@ -1209,8 +1223,8 @@ static void tabs_body(float scale, bool in_game, void (*prelaunch)(float)) {
     static const int order[] = {8, 0, 1, 10, 6, 7, 3, 5, 4, 2, 9};  // Controls, Video, Audio, Season, Gameplay, Cosmetics, Randomizer,
                                                                 // Cheats, Warp, Save Editor, Quit (ids stay: test hooks)
     for (int i : order)  // (Quit: in game only - the start screen has its own QUIT, and an eleventh tab cut names short)
-        if ((i != 9 || !prelaunch) && !(game_is_d3() && i >= 2 && i <= 7))  // (Diablo III: Link's Awakening tabs out)
-            tabs[ntabs++] = {names[i], i, in_game || (i != 2 && i != 4 && i != 5)};
+        if ((i != 9 || !prelaunch) && !(game_is_d3() && i >= 2 && i <= 7 && i != 5))  // (Diablo III: Link's Awakening tabs out)
+            tabs[ntabs++] = {names[i], i, in_game || (i != 2 && i != 4)};
     int cur = 0;  // g_tab / g_tab_request hold ids
     for (int i = 0; i < ntabs; i++) if (tabs[i].id == g_tab) cur = i;
     if (!tabs[cur].on) cur = 0;
@@ -1384,7 +1398,7 @@ static void tabs_body(float scale, bool in_game, void (*prelaunch)(float)) {
                     break;
                 case 3: rando_tab_draw(scale); break;
                 case 4: if (warp_tab_draw(scale)) set_open(false); break;
-                case 5: cheats_draw(scale); break;
+                case 5: if (game_is_d3()) d3_cheats_tab_draw(scale); else cheats_draw(scale); break;
                 case 6: difficulty_draw(scale); break;
                 case 7: tab_cosmetics(); break;
                 case 8: controls_tab_draw(scale); break;

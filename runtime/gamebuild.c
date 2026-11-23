@@ -2,6 +2,7 @@
 #include "gamebuild.h"
 #include "build_cache.h"
 
+#include <dirent.h>
 #include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -378,9 +379,25 @@ bool gamebuild_run(const char *game_dir, const GameBuildOpts *o, char *why, size
         snprintf(rp, sizeof rp, "%s" SEP "gamelib_entry.receipt", work);
         update = stat(rp, &st) == 0;
     }
-    const char *gen_inputs[5] = {input_paths[0], input_paths[1], t.gen, t.hle};
+    const char *gen_inputs[40] = {input_paths[0], input_paths[1], t.gen, t.hle};
     int ngen = 4;
     if (t.gen_script[0]) gen_inputs[ngen++] = t.gen_script;
+    char cheat_paths[32][1100];
+    int ncheats = 0;
+    {
+        DIR *cd = opendir("cheats");
+        if (cd) {
+            struct dirent *de;
+            while ((de = readdir(cd)) && ncheats < 32) {
+                size_t len = strlen(de->d_name);
+                if (len > 4 && !strcasecmp(de->d_name + len - 4, ".txt")) {
+                    snprintf(cheat_paths[ncheats], sizeof cheat_paths[ncheats], "cheats" SEP "%s", de->d_name);
+                    gen_inputs[ngen++] = cheat_paths[ncheats++];
+                }
+            }
+            closedir(cd);
+        }
+    }
     if (!build_cache_prepare_generation(cache, GAMELIB_ID, gen_inputs, ngen, why, why_size)) {
         build_cache_failed(cache);
         build_cache_close(cache);
