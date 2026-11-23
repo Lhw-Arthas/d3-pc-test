@@ -150,6 +150,7 @@ static void apply_xvars(Cpu *c) {
         call_xvar_u32(c, OFF_SEASON_NUM, (uint32_t)season);
         call_xvar_u32(c, OFF_SEASON_STATE, 1);
         call_xvar_bool(c, OFF_SEASON_OVR, 1);
+        *(volatile uint32_t *)(uintptr_t)(MAIN_BASE + 0x18626b8ull) = 1; // 显示创建英雄界面的赛季选项！
         *(volatile uint32_t *)(uintptr_t)(MAIN_BASE + 0x18627a4ull) = 1; // 强制解锁创建赛季英雄标志
     } else {
         call_xvar_u32(c, OFF_SEASON_STATE, 0);
