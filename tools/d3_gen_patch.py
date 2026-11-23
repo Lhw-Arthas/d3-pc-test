@@ -357,80 +357,82 @@ def _find_cheats_dir():
     return None
 
 def _build_cheat_table():
-    cheats_dir = _find_cheats_dir()
-    if not cheats_dir:
-        return []
-    entries = []
-    seen = set()
-    for fname in sorted(os.listdir(cheats_dir)):
-        if not fname.lower().endswith('.txt'):
-            continue
-        cur_name, cur_ops = None, []
-        with open(os.path.join(cheats_dir, fname), encoding='utf-8', errors='ignore') as f:
-            for raw in f:
-                line = raw.strip()
-                if not line:
-                    continue
-                if line.startswith('[') and line.endswith(']'):
-                    if cur_name and cur_ops and cur_name not in seen:
-                        seen.add(cur_name)
-                        entries.append((cur_name, cur_ops))
-                    cur_name = line[1:-1].lstrip('►★ ').strip()
-                    cur_ops = []
-                elif cur_name:
-                 parts = line.split()
-                 if len(parts) == 3:
-                  op_type, op_off, op_val = parts
-                  if op_type.upper() == '04000000':
-                   try:
-                    cur_ops.append((int(op_off, 16), int(op_val, 16)))
-                   except ValueError:
-                    pass                    
-        if cur_name and cur_ops and cur_name not in seen:
-            seen.add(cur_name)
-            entries.append((cur_name, cur_ops))
+ cheats_dir = _find_cheats_dir()
+ if not cheats_dir:
+  return []
+ entries = []
+ seen = set()
+ for fname in sorted(os.listdir(cheats_dir)):
+  if not fname.lower().endswith('.txt'):
+   continue
+  cur_name, cur_ops = None, []
+  with open(os.path.join(cheats_dir, fname), encoding='utf-8', errors='ignore') as f:
+   for raw in f:
+    line = raw.strip()
+    if not line:
+     continue
+    if line.startswith('[') and line.endswith(']'):
+     if cur_name and cur_ops and cur_name not in seen:
+      seen.add(cur_name)
+      entries.append((cur_name, cur_ops))
+     cur_name = line[1:-1].lstrip('►★ ').strip()
+     cur_ops = []
+    elif cur_name:
+     parts = line.split()
+     if len(parts) == 3:
+      op_type, op_off, op_val = parts
+      if op_type.upper() == '04000000':
+       try:
+        cur_ops.append((int(op_off, 16), int(op_val, 16)))
+       except ValueError:
+        pass
+  if cur_name and cur_ops and cur_name not in seen:
+   seen.add(cur_name)
+   entries.append((cur_name, cur_ops))
 
-    rules = []
-    used_vas = set()
-    cid = 0
-    try:
-        import gen as _gen
-        for name, ops in entries:
-            if any(off >= 0xC70000 or (0x7000000000 + off) in used_vas for off, _ in ops):
-                continue
-            lifted = []
-            ok = True
-            for off, word in ops:
-                va = 0x7000000000 + off
-                m = _gen.Module.__new__(_gen.Module)
-                m.base = m.text_va = 0x7000000000
-                m.text_end = 0x7002000000
-                m.data = bytearray(word.to_bytes(4, 'little')) + bytearray(4)
-                lines = m.emit_function(0x7000000000, 0x7000000004, {0x7000000000}, set(), {})
-                stmts = []
-                for l in lines:
-                    t = l.strip()
-                    if not t or t.startswith(('void f_', 'FN_ENTER', 'L_', '}', 'return;', 'rt_udf', '__attribute__')):
-                        continue
-                    t = re.sub(r'0x700000([0-9a-fA-F]{4})ull',
-                               lambda x: f'0x{va + int(x.group(1), 16):x}ull', t)
-                    t = re.sub(r'goto L_700000([0-9a-fA-F]{4});',
-                               lambda x: f'goto L_{va + int(x.group(1), 16):x};', t)
-                    stmts.append(t)
-                code = ' '.join(stmts)
-                if not code or 'rt_udf' in code:
-                    ok = False
-                    break
-                lifted.append((va, code))
-            if ok and lifted:
-                for va, code in lifted:
-                    used_vas.add(va)
-                    rules.append((cid, name, va, code))
-                cid += 1
-    except Exception as e:
-        print(f'[d3_cheats] error: {e}')
-    print(f'[d3_cheats] loaded {cid} cheats from {cheats_dir}')
-    return rules
+ rules = []
+ used_vas = set()
+ cid = 0
+ try:
+  from lifter import Lifter, emit_asm_batch, hx
+  lft = Lifter(0x7000000000, 'c')
+  for name, ops in entries:
+   if any(off >= 0xC70000 or (0x7000000000 + off) in used_vas for off, _ in ops):
+    continue
+   lifted = []
+   ok = True
+   for off, word in ops:
+    va = 0x7000000000 + off
+    ins = lft.lift(word, va)
+    k = ins.kind
+    if k == 'op':
+     code = ins.code
+    elif k == 'asm':
+     code = emit_asm_batch([ins.asm])
+    elif k == 'ret':
+     code = 'return;'
+    elif k == 'b':
+     code = f'goto L_{ins.target:x};'
+    elif k == 'bcond':
+     code = f'if ({ins.cond}) {{ goto L_{ins.target:x}; }}'
+    elif k == 'bl':
+     code = f'c->x[30] = {hx(va + 4)}; f_{ins.target:x}(c);'
+    else:
+     ok = False
+     break
+    if not code or 'rt_udf' in code:
+     ok = False
+     break
+    lifted.append((va, code))
+   if ok and lifted:
+    for va, code in lifted:
+     used_vas.add(va)
+     rules.append((cid, name, va, code))
+    cid += 1
+ except Exception as e:
+  print(f'[d3_cheats] error: {e}')
+ print(f'[d3_cheats] loaded {cid} cheats from {cheats_dir}')
+ return rules
 
 CHEAT_DECL = 'int d3_cheat_on(int id);  /* d3_gen_patch.py */\n'
 CHEAT_RULES = _build_cheat_table()
@@ -443,6 +445,10 @@ def apply_cheat_patches(fn, s):
   lbl = f'L_{va:x}:;'
   tag = f'/* cheat:{cid}:{va:x} */'
   if lbl not in s or tag in s:
+   continue
+  # 若新指令包含 goto L_xxx; 且目标标签未在当前文件中生成，则安全跳过该条（不改动 gen.py，零编译风险）
+  m_goto = re.search(r'goto (L_[0-9a-f]+);', c_code)
+  if m_goto and f'{m_goto.group(1)}:' not in s:
    continue
   pat = re.compile(rf'({re.escape(lbl)}\n)(.*?)(\n(?:\s*L_[0-9a-f]+:;|\}}))', re.DOTALL)
   def repl_fn(m):
