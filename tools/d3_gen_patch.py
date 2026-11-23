@@ -190,36 +190,35 @@ UPGRADES = [
 
 SEASON_DECL = 'int d3_offline_season_num(void);  /* d3_gen_patch.py */\n'
 
-# (规则名称, 探测特征字符串, 正则匹配模式, 替换字符串)
 SEASON_RULES = [
-    # 1. IsSignedInOnline (main+0x56b10) -> 开启离线赛季时直接返回 1
+    # 1. IsSignedInOnline (main+0x56b10) -> 直接匹配函数左大括号后的第一行
     ('IsSignedInOnline',
      'void f_7000056b10(Cpu *c)',
-     r'(void f_7000056b10\(Cpu \*c\) \{\n    FN_ENTER\(0x7000056b10ull\);\n)',
+     r'(void f_7000056b10\(Cpu \*c\) \{\n(?:    FN_ENTER[^\n]*\n)?)',
      r'\1    if (d3_offline_season_num() > 0) { c->x[0] = 1; return; }  /* d3_gen_patch.py */\n'),
 
-    # 2. ValidateHeroForPartyMember (main+0x1bf5f0) -> 开启离线赛季时直接返回 0（无错误）
+    # 2. ValidateHeroForPartyMember (main+0x1bf5f0) -> 直接匹配函数左大括号后的第一行
     ('ValidateHeroForPartyMember',
      'void f_70001bf5f0(Cpu *c)',
-     r'(void f_70001bf5f0\(Cpu \*c\) \{\n    FN_ENTER\(0x70001bf5f0ull\);\n)',
+     r'(void f_70001bf5f0\(Cpu \*c\) \{\n(?:    FN_ENTER[^\n]*\n)?)',
      r'\1    if (d3_offline_season_num() > 0) { c->x[0] = 0; return; }  /* d3_gen_patch.py */\n'),
 
-    # 3. IsSeasonsInitialized (main+0x5ff0c: and w0, w8, #1) -> 强制返回 1
+    # 3. IsSeasonsInitialized (main+0x5ff0c) -> 兼容 L_700005ff0c 标签或注释地址
     ('IsSeasonsInitialized',
-     'L_700005ff0c:',
-     r'(L_700005ff0c:;\n)([^\n]+\n)',
+     '700005ff0c',
+     r'((?:L_700005ff0c:;|/\*[^*]*700005ff0c[^*]*\*/)\n)([^\n]+\n)',
      r'\1    if (d3_offline_season_num() > 0) { c->x[0] = 1; } else { \2    }  /* d3_gen_patch.py */\n'),
 
-    # 4. 创建赛季角色确认回调 (main+0x351ccc: b.ne -> mov w1, #1)
+    # 4. 创建赛季角色确认回调 (main+0x351ccc)
     ('SeasonConfirmCallback',
-     'L_7000351ccc:',
-     r'(L_7000351ccc:;\n)([^\n]+\n)',
+     '7000351ccc',
+     r'((?:L_7000351ccc:;|/\*[^*]*7000351ccc[^*]*\*/)\n)([^\n]+\n)',
      r'\1    if (d3_offline_season_num() > 0) { c->x[1] = 1; } else { \2    }  /* d3_gen_patch.py */\n'),
 
-    # 5. SetGameParamsForHero (main+0x1bd140: ldr w21, [x8, #0x90]) -> 写入设定的赛季号
+    # 5. SetGameParamsForHero (main+0x1bd140)
     ('SetGameParamsForHero',
-     'L_70001bd140:',
-     r'(L_70001bd140:;\n)([^\n]+\n)',
+     '70001bd140',
+     r'((?:L_70001bd140:;|/\*[^*]*70001bd140[^*]*\*/)\n)([^\n]+\n)',
      r'\1    if (d3_offline_season_num() > 0) { c->x[21] = (uint32_t)d3_offline_season_num(); } else { \2    }  /* d3_gen_patch.py */\n'),
 ]
 
@@ -230,7 +229,9 @@ def apply_season_patches(fn, s):
             continue
         s_new, n = re.subn(pat, repl.replace('/* d3_gen_patch.py */', f'/* d3_gen_patch.py: {name} */'), s, count=1)
         if n != 1:
-            raise SystemExit(f'd3_gen_patch: {fn}: {name} ({probe}) matched {n} times')
+            idx = s.find(probe)
+            snippet = s[max(0, idx - 60):idx + 220].replace('\n', '\\n')
+            raise SystemExit(f'd3_gen_patch: {fn}: {name} matched {n} times. Context: {snippet}')
         s = s_new
         changed = True
     if changed and SEASON_DECL not in s:
