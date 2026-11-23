@@ -233,6 +233,18 @@ SEASON_RULES = [
      r'(void f_700072e090\(Cpu \*c\) \{\n(?:    FN_ENTER[^\n]*\n)?)',
      r'\1    if (d3_offline_season_num() > 0) { c->x[0] = (uint32_t)d3_offline_season_num(); return; }  /* d3_gen_patch.py */\n'),
     
+    # 8. 解锁赛季道具掉落权 - 掉落校验跳过 (main+0x492f60: B +0x14 -> L_7000492f74)
+    ('SeasonDropUnlock1',
+     'L_7000492f60:;',
+     r'(L_7000492f60:;\n)',
+     r'\1    if (d3_offline_season_num() > 0) { goto L_7000492f74; }  /* d3_gen_patch.py */\n'),
+
+    # 9. 解锁赛季道具掉落权 - 赛季掉落资格校验直接返回 1 (main+0x897988: MOV W0,#1; B +0x68 -> L_70008979f4)
+    ('SeasonDropUnlock2',
+     'c->x[30] = 0x700089798cull; f_700050e800(c);',
+     r'(    c->x\[30\] = 0x700089798cull; f_700050e800\(c\);\n)',
+     r'    if (d3_offline_season_num() > 0) { c->x[0] = 1; goto L_70008979f4; }  /* d3_gen_patch.py */\n\1'),
+
 ]
 
 def apply_season_patches(fn, s):
