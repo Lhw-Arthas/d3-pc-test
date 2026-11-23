@@ -191,34 +191,34 @@ UPGRADES = [
 SEASON_DECL = 'int d3_offline_season_num(void);  /* d3_gen_patch.py */\n'
 
 SEASON_RULES = [
-    # 1. IsSignedInOnline (main+0x56b10) -> 直接匹配函数左大括号后的第一行
+    # 1. IsSignedInOnline (main+0x56b10) -> 加上 '{' 跳过前向声明
     ('IsSignedInOnline',
-     'void f_7000056b10(Cpu *c)',
+     'void f_7000056b10(Cpu *c) {',
      r'(void f_7000056b10\(Cpu \*c\) \{\n(?:    FN_ENTER[^\n]*\n)?)',
      r'\1    if (d3_offline_season_num() > 0) { c->x[0] = 1; return; }  /* d3_gen_patch.py */\n'),
 
-    # 2. ValidateHeroForPartyMember (main+0x1bf5f0) -> 直接匹配函数左大括号后的第一行
+    # 2. ValidateHeroForPartyMember (main+0x1bf5f0) -> 加上 '{' 跳过前向声明
     ('ValidateHeroForPartyMember',
-     'void f_70001bf5f0(Cpu *c)',
+     'void f_70001bf5f0(Cpu *c) {',
      r'(void f_70001bf5f0\(Cpu \*c\) \{\n(?:    FN_ENTER[^\n]*\n)?)',
      r'\1    if (d3_offline_season_num() > 0) { c->x[0] = 0; return; }  /* d3_gen_patch.py */\n'),
 
-    # 3. IsSeasonsInitialized (main+0x5ff0c) -> 兼容 L_700005ff0c 标签或注释地址
+    # 3. IsSeasonsInitialized (main+0x5ff0c: and w0, w8, #1)
     ('IsSeasonsInitialized',
-     '700005ff0c',
-     r'((?:L_700005ff0c:;|/\*[^*]*700005ff0c[^*]*\*/)\n)([^\n]+\n)',
+     'L_700005ff0c:',
+     r'(L_700005ff0c:;\n)([^\n]+\n)',
      r'\1    if (d3_offline_season_num() > 0) { c->x[0] = 1; } else { \2    }  /* d3_gen_patch.py */\n'),
 
     # 4. 创建赛季角色确认回调 (main+0x351ccc)
     ('SeasonConfirmCallback',
-     '7000351ccc',
-     r'((?:L_7000351ccc:;|/\*[^*]*7000351ccc[^*]*\*/)\n)([^\n]+\n)',
+     'L_7000351ccc:',
+     r'(L_7000351ccc:;\n)([^\n]+\n)',
      r'\1    if (d3_offline_season_num() > 0) { c->x[1] = 1; } else { \2    }  /* d3_gen_patch.py */\n'),
 
     # 5. SetGameParamsForHero (main+0x1bd140)
     ('SetGameParamsForHero',
-     '70001bd140',
-     r'((?:L_70001bd140:;|/\*[^*]*70001bd140[^*]*\*/)\n)([^\n]+\n)',
+     'L_70001bd140:',
+     r'(L_70001bd140:;\n)([^\n]+\n)',
      r'\1    if (d3_offline_season_num() > 0) { c->x[21] = (uint32_t)d3_offline_season_num(); } else { \2    }  /* d3_gen_patch.py */\n'),
 ]
 
