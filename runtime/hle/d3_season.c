@@ -71,19 +71,20 @@ int d3_offline_season_num(void) {
     return (s >= 1 && s <= 99) ? s : 0;
 }
 
-static uint32_t current_buff_mask(int season, int theme_choice) {
-    if (theme_choice <= 0) return 0;
-    if (theme_choice == 1) { // Auto: 自动匹配赛季主题
+static uint32_t current_buff_mask(int season) {
+    uint32_t mask = g_settings.d3_themes_mask;
+    if (g_settings.d3_theme_auto && season > 0) {
         for (size_t i = 0; i < sizeof k_themes / sizeof *k_themes; i++) {
-            if (k_themes[i].season == season) return k_themes[i].mask;
+            if (k_themes[i].season == season) {
+                mask |= k_themes[i].mask;
+                break;
+            }
         }
-        return 0;
     }
-    int idx = theme_choice - 2;
-    return (idx >= 0 && idx < NBUFF) ? (1u << idx) : 0;
+    return mask;
 }
 
-// 在 main.c 的 boot() 中调用：支持环境变量作为初始默认值
+// 在 main.c 的 boot() 中调用：支持环境变量作为初始默认值 (支持逗号分隔多选，如 D3_THEME=alchemy,nesting,ethereal)
 void d3_season_init(void) {
     if (!game_is_d3()) return;
     const char *es = getenv("D3_SEASON");
@@ -93,11 +94,26 @@ void d3_season_init(void) {
     }
     const char *et = getenv("D3_THEME");
     if (et && *et) {
-        if (!strcmp(et, "auto")) g_settings.d3_theme = 1;
-        else if (!strcmp(et, "0") || !strcmp(et, "off")) g_settings.d3_theme = 0;
-        else {
-            for (int i = 0; i < NBUFF; i++) {
-                if (!strcmp(et, k_buffs[i].key)) { g_settings.d3_theme = i + 2; break; }
+        if (!strcmp(et, "0") || !strcmp(et, "off")) {
+            g_settings.d3_theme_auto = false;
+            g_settings.d3_themes_mask = 0;
+        } else {
+            char buf[256];
+            snprintf(buf, sizeof buf, "%s", et);
+            g_settings.d3_theme_auto = false;
+            g_settings.d3_themes_mask = 0;
+            char *tok = strtok(buf, ",");
+            while (tok) {
+                if (!strcmp(tok, "auto")) g_settings.d3_theme_auto = true;
+                else {
+                    for (int i = 0; i < NBUFF; i++) {
+                        if (!strcmp(tok, k_buffs[i].key)) {
+                            g_settings.d3_themes_mask |= (1u << i);
+                            break;
+                        }
+                    }
+                }
+                tok = strtok(NULL, ",");
             }
         }
     }
@@ -128,7 +144,7 @@ static void call_xvar_u32(Cpu *c, uint32_t off, uint32_t val) {
 
 static void apply_xvars(Cpu *c) {
     int season = d3_offline_season_num();
-    uint32_t mask = current_buff_mask(season, g_settings.d3_theme);
+    uint32_t mask = current_buff_mask(season);
 
     if (season > 0) {
         call_xvar_u32(c, OFF_SEASON_NUM, (uint32_t)season);
@@ -160,6 +176,6 @@ void d3_season_run(Cpu *c) {
     static unsigned polls = 0;
     bool need = atomic_exchange(&g_dirty, false);
     if (!need && (++polls % 180 != 0)) return; // 菜单改动时立即应用，平时每 ~3 秒维护一次
-    if (g_settings.d3_season == 0 && g_settings.d3_theme == 0 && !need) return;
+    if (g_settings.d3_season == 0 && !g_settings.d3_theme_auto && g_settings.d3_themes_mask == 0 && !need) return;
     apply_xvars(c);
 }

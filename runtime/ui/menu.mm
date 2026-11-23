@@ -831,67 +831,6 @@ static void tab_display(void) {
                  "Your name in the game: shown under P1 on the main menu (on a Switch, your account's name - your heroes "
                  "keep their own names). Empty: this PC's user name. Shows from the next start of the game.");
 
-        // ---> 在这里插入离线赛季与赛季主题菜单 <---
-        opt_section("Offline Season");
-        {
-            static const char *seasons[] = {
-                "Off",
-                "Season 14 (Greed)", "Season 15 (Boon)", "Season 16 (Grandeur)", "Season 17 (Nightmares)",
-                "Season 18 (Triune)", "Season 19 (Eternal Conflict)", "Season 20 (Forbidden Archives)",
-                "Season 21 (Trials of Tempests)", "Season 22 (Shades of the Nephalem)",
-                "Season 24 (Ethereal Memory)", "Season 25 (Lords of Hell)", "Season 26 (Fall of the Nephalem)",
-                "Season 27 (Light's Calling)", "Season 28 (Rites of Sanctuary)", "Season 29 (Visions of Enmity)",
-                "Season 30 (Lords of Hell)", "Season 31 (Forbidden Archives)", "Season 32 (Ethereal Memory)",
-                "Season 33 (Shades of the Nephalem)", "Season 34 (Light's Calling)", "Season 35 (Eternal Conflict)",
-                "Season 36 (Lords of Hell)", "Season 37 (Forbidden Archives)"
-            };
-            static const int season_nums[] = {
-                0, 14, 15, 16, 17, 18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37
-            };
-            enum { NSEASONS = sizeof season_nums / sizeof season_nums[0] };
-            int si = 0;
-            for (int i = 0; i < NSEASONS; i++) {
-                if (season_nums[i] == g_settings.d3_season) { si = i; break; }
-            }
-            if (opt_choice("Season", &si, seasons, NSEASONS, 0,
-                           "Enables offline seasonal play and allows creating seasonal heroes. "
-                           "Change this on the title screen before starting a game.", false)) {
-                g_settings.d3_season = season_nums[si];
-                d3_season_mark_dirty();
-            }
-
-            static const char *themes[] = {
-                "Off",
-                "Auto (Match Season)",
-                "Double Rift Keystones",
-                "Double Blood Shards",
-                "S14: Double Treasure Goblins",
-                "S15: Double Bounty Bags",
-                "S16: Royal Grandeur",
-                "S17: Legacy of Nightmares",
-                "S18: Triune's Will",
-                "S19/35: Pandemonium",
-                "S20/31/37: Kanai Powers",
-                "S21: Trials of Tempests",
-                "S22/33: Shadow Clones",
-                "S22/33: 4th Kanai's Cube Slot",
-                "S24/32: Ethereal Items",
-                "S25/30/36: Soul Shards",
-                "S26: Echoing Nightmares",
-                "S27/34: Sanctified Items",
-                "S28: Altar of Rites (Dark Alchemy)",
-                "S29: Visions of Enmity"
-            };
-            enum { NTHEMES = sizeof themes / sizeof themes[0] };
-            int ti = (g_settings.d3_theme >= 0 && g_settings.d3_theme < NTHEMES) ? g_settings.d3_theme : 0;
-            if (opt_choice("Season theme", &ti, themes, NTHEMES, 1,
-                           "Community event buff active in game. Auto matches the selected season's theme; "
-                           "or pick any theme to apply to all heroes.", false)) {
-                g_settings.d3_theme = ti;
-                d3_season_mark_dirty();
-            }
-        }
-
         opt_end();
         return;
     }  // (the rows below are Link's Awakening's)
@@ -900,6 +839,83 @@ static void tab_display(void) {
                "Turns off the tilt-shift blur at the top and bottom of the screen.");
     opt_toggle("Hide Hero Mode icon", &g_settings.hide_hero_icon, false,
                "Hides the Hero Mode emblem in the corner of the screen while playing a Hero Mode file.");
+    opt_end();
+}
+
+static void tab_season(void) {
+    float scale = ImGui::GetFontSize() / 34;
+    opt_begin("##season", scale);
+
+    opt_section("Offline Season");
+    {
+        static const char *seasons[] = {
+            "Off",
+            "Season 14 (Greed)", "Season 15 (Boon)", "Season 16 (Grandeur)", "Season 17 (Nightmares)",
+            "Season 18 (Triune)", "Season 19 (Eternal Conflict)", "Season 20 (Forbidden Archives)",
+            "Season 21 (Trials of Tempests)", "Season 22 (Shades of the Nephalem)",
+            "Season 24 (Ethereal Memory)", "Season 25 (Lords of Hell)", "Season 26 (Fall of the Nephalem)",
+            "Season 27 (Light's Calling)", "Season 28 (Rites of Sanctuary)", "Season 29 (Visions of Enmity)",
+            "Season 30 (Lords of Hell)", "Season 31 (Forbidden Archives)", "Season 32 (Ethereal Memory)",
+            "Season 33 (Shades of the Nephalem)", "Season 34 (Light's Calling)", "Season 35 (Eternal Conflict)",
+            "Season 36 (Lords of Hell)", "Season 37 (Forbidden Archives)"
+        };
+        static const int season_nums[] = {
+            0, 14, 15, 16, 17, 18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37
+        };
+        enum { NSEASONS = sizeof season_nums / sizeof season_nums[0] };
+        int si = 0;
+        for (int i = 0; i < NSEASONS; i++) {
+            if (season_nums[i] == g_settings.d3_season) { si = i; break; }
+        }
+        if (opt_choice("Season", &si, seasons, NSEASONS, 0,
+                       "Enables offline seasonal play. Change this on the title screen before starting a game.", false)) {
+            g_settings.d3_season = season_nums[si];
+            d3_season_mark_dirty();
+        }
+    }
+
+    opt_section("Season Themes (Multi-Select)");
+    {
+        if (opt_toggle("Auto (Match Selected Season)", &g_settings.d3_theme_auto, true,
+                       "Automatically activates the native community theme for the Season selected above.")) {
+            d3_season_mark_dirty();
+        }
+        if (opt_action("Clear All Custom Themes", "", "Turns off all manually toggled themes below.", false, false)) {
+            g_settings.d3_themes_mask = 0;
+            d3_season_mark_dirty();
+        }
+
+        static const struct { const char *name; const char *desc; } k_theme_items[18] = {
+            {"Double Rift Keystones", "Rift Guardians drop double Greater Rift Keystones."},
+            {"Double Blood Shards", "Doubles all Blood Shard drops."},
+            {"S14: Double Treasure Goblins", "Treasure Goblins spawn in pairs."},
+            {"S15: Double Bounty Bags", "Horadric Caches from bounties are doubled."},
+            {"S16: Royal Grandeur", "All players gain the Ring of Royal Grandeur legendary power."},
+            {"S17: Legacy of Nightmares", "Every Ancient item equipped increases damage dealt and reduces damage taken (with no set bonuses)."},
+            {"S18: Triune's Will", "Circles of power spawn on the ground granting resource, cooldown, or damage buffs."},
+            {"S19/35: Pandemonium", "Killstreaks unleash elemental powers and eventually summon Angels."},
+            {"S20/31/37: Kanai Powers", "All three Kanai's Cube slots can equip any weapon, armor, or jewelry power."},
+            {"S21: Trials of Tempests", "Your character periodically channels an elemental storm."},
+            {"S22/33: Shadow Clones", "Activating a Pylon spawns a Shadow Clone of your class."},
+            {"S22/33: 4th Kanai's Cube Slot", "Unlocks a 4th wildcard slot in Kanai's Cube."},
+            {"S24/32: Ethereal Items", "Powerful class-specific Ethereal weapons can drop."},
+            {"S25/30/36: Soul Shards", "Demon Lords drop Soul Shards that socket into helms and weapons."},
+            {"S26: Echoing Nightmares", "Petrified Screams open portals to the Echoing Nightmare."},
+            {"S27/34: Sanctified Items", "Angelic Crucibles can sanctify any legendary item with max stats and a class power."},
+            {"S28: Altar of Rites (Dark Alchemy)", "Unlocks the Altar of Rites in New Tristram for account-wide seals and potions."},
+            {"S29: Visions of Enmity", "Killing enemies in the open world can spawn Diabolical Fissure portals."}
+        };
+
+        for (int i = 0; i < 18; i++) {
+            bool on = (g_settings.d3_themes_mask >> i) & 1u;
+            if (opt_toggle(k_theme_items[i].name, &on, false, k_theme_items[i].desc)) {
+                if (on) g_settings.d3_themes_mask |= (1u << i);
+                else g_settings.d3_themes_mask &= ~(1u << i);
+                d3_season_mark_dirty();
+            }
+        }
+    }
+
     opt_end();
 }
 
@@ -1189,8 +1205,8 @@ static void tabs_body(float scale, bool in_game, void (*prelaunch)(float)) {
     int ntabs = 0;
     if (prelaunch) tabs[ntabs++] = {"Prelaunch", -1, true};
     static const char *names[] = {"Video", "Audio", "Save Editor", "Randomizer", "Warp", "Cheats", "Gameplay",
-                                  "Cosmetics", "Controls", "Quit"};
-    static const int order[] = {8, 0, 1, 6, 7, 3, 5, 4, 2, 9};  // Controls, Video, Audio, Gameplay, Cosmetics, Randomizer,
+                                  "Cosmetics", "Controls", "Quit", "Season"};
+    static const int order[] = {8, 0, 1, 10, 6, 7, 3, 5, 4, 2, 9};  // Controls, Video, Audio, Season, Gameplay, Cosmetics, Randomizer,
                                                                 // Cheats, Warp, Save Editor, Quit (ids stay: test hooks)
     for (int i : order)  // (Quit: in game only - the start screen has its own QUIT, and an eleventh tab cut names short)
         if ((i != 9 || !prelaunch) && !(game_is_d3() && i >= 2 && i <= 7))  // (Diablo III: Link's Awakening tabs out)
@@ -1373,6 +1389,7 @@ static void tabs_body(float scale, bool in_game, void (*prelaunch)(float)) {
                 case 7: tab_cosmetics(); break;
                 case 8: controls_tab_draw(scale); break;
                 case 9: tab_quit(scale, in_game); break;
+                case 10: tab_season(); break;
                 }
                 static const char *scroll_test = getenv("LARECOMP_MENU_SCROLL");  // test hook: page scroll, 0..1
                 if (scroll_test) ImGui::SetScrollY(ImGui::GetScrollMaxY() * (float)atof(scroll_test));

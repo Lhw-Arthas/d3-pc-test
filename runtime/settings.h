@@ -2,6 +2,7 @@
 #pragma once
 #include "cosmetic_colour.h"
 #include <stdbool.h>
+#include <stdint.h>
 
 enum { ASPECT_UNLOCKED = 0, ASPECT_ORIGINAL = 1 };
 enum { RES_MATCH = 0, /* 1..8 = 1x..8x */ RES_DYNAMIC = 9, RES_Q75 = 10, RES_Q25 = 11, RES_Q50 = 12,
@@ -98,8 +99,9 @@ typedef struct {
     char player_name[33];  // the player's name in the game (its user profile nickname, services/acc.c); empty = the PC's user name
     char rando_options[48];  // the Randomizer tab's New seed options: a seed ID without its random part (empty = defaults)
     // Diablo III 离线赛季与赛季主题 (runtime/hle/d3_season.c)
-    int d3_season;       // 0 = 关闭, 1..99 = 离线赛季号 (如 28 = 庇护之地仪式, 37 = 禁断档案库)
-    int d3_theme;        // 0 = 关闭, 1 = 自动匹配当前赛季主题, 2..19 = 指定单个赛季主题 Buff
+    int d3_season;           // 0 = 关闭, 1..99 = 离线赛季号
+    bool d3_theme_auto;      // true = 自动激活当前所选赛季的原生主题
+    uint32_t d3_themes_mask; // 额外手动勾选的多选赛季主题位掩码 (bit 0..17 对应 18 个主题)
 } Settings;
 
 
