@@ -32,10 +32,10 @@ static std::string trim_str(const std::string &s) {
 static std::string strip_prefix(const std::string &s) {
     size_t i = 0;
     while (i < s.size()) {
-        unsigned char c = (unsigned char)s[i];
+        unsigned char c = (unsigned char)s.at(i);
         if (c == ' ' || c == '\t') { i++; continue; }
-        if (i + 2 < s.size() && c == 0xE2 && (unsigned char)s[i+1] == 0x96 && (unsigned char)s[i+2] == 0xBA) { i += 3; continue; }
-        if (i + 2 < s.size() && c == 0xE2 && (unsigned char)s[i+1] == 0x98 && (unsigned char)s[i+2] == 0x85) { i += 3; continue; }
+        if (i + 2 < s.size() && c == 0xE2 && (unsigned char)s.at(i + 1) == 0x96 && (unsigned char)s.at(i + 2) == 0xBA) { i += 3; continue; }
+        if (i + 2 < s.size() && c == 0xE2 && (unsigned char)s.at(i + 1) == 0x98 && (unsigned char)s.at(i + 2) == 0x85) { i += 3; continue; }
         break;
     }
     return trim_str(s.substr(i));
@@ -66,7 +66,7 @@ static void d3_cheats_ensure_loaded(void) {
     for (const auto &fp : files) {
         FILE *f = fopen(fp.string().c_str(), "rb");
         if (!f) continue;
-        char buf;
+        std::vector<char> buf(1024, 0);
         std::string cur_name;
         std::vector<uint32_t> cur_offs;
         bool valid = true;
@@ -82,8 +82,8 @@ static void d3_cheats_ensure_loaded(void) {
             valid = true;
         };
 
-        while (fgets(buf, sizeof buf, f)) {
-            std::string line = trim_str(buf);
+        while (fgets(buf.data(), (int)buf.size(), f)) {
+            std::string line = trim_str(buf.data());
             if (line.empty()) continue;
             if (line.front() == '[' && line.back() == ']') {
                 flush_entry();
@@ -103,7 +103,7 @@ static void d3_cheats_ensure_loaded(void) {
 
 extern "C" int d3_cheat_on(int id) {
     if (id < 0 || id >= (int)g_cheats.size()) return 0;
-    return g_cheats[id].enabled ? 1 : 0;
+    return g_cheats.at((size_t)id).enabled ? 1 : 0;
 }
 
 extern "C" void d3_cheats_tab_draw(float scale) {
@@ -117,7 +117,7 @@ extern "C" void d3_cheats_tab_draw(float scale) {
             for (auto &c : g_cheats) c.enabled = false;
         }
         for (size_t i = 0; i < g_cheats.size(); i++) {
-            opt_toggle(g_cheats[i].name.c_str(), &g_cheats[i].enabled, false, "Toggle this cheat in real time.");
+            opt_toggle(g_cheats.at(i).name.c_str(), &g_cheats.at(i).enabled, false, "Toggle this cheat in real time.");
         }
     }
     opt_end();
