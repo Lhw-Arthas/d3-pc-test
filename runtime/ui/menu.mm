@@ -829,6 +829,69 @@ static void tab_display(void) {
         opt_text("Player name", g_settings.player_name, sizeof g_settings.player_name, "Your PC's user name",
                  "Your name in the game: shown under P1 on the main menu (on a Switch, your account's name - your heroes "
                  "keep their own names). Empty: this PC's user name. Shows from the next start of the game.");
+
+        // ---> 在这里插入离线赛季与赛季主题菜单 <---
+        extern "C" void d3_season_mark_dirty(void);
+        opt_section("Offline Season");
+        {
+            static const char *seasons[] = {
+                "Off",
+                "Season 14 (Greed)", "Season 15 (Boon)", "Season 16 (Grandeur)", "Season 17 (Nightmares)",
+                "Season 18 (Triune)", "Season 19 (Eternal Conflict)", "Season 20 (Forbidden Archives)",
+                "Season 21 (Trials of Tempests)", "Season 22 (Shades of the Nephalem)",
+                "Season 24 (Ethereal Memory)", "Season 25 (Lords of Hell)", "Season 26 (Fall of the Nephalem)",
+                "Season 27 (Light's Calling)", "Season 28 (Rites of Sanctuary)", "Season 29 (Visions of Enmity)",
+                "Season 30 (Lords of Hell)", "Season 31 (Forbidden Archives)", "Season 32 (Ethereal Memory)",
+                "Season 33 (Shades of the Nephalem)", "Season 34 (Light's Calling)", "Season 35 (Eternal Conflict)",
+                "Season 36 (Lords of Hell)", "Season 37 (Forbidden Archives)"
+            };
+            static const int season_nums[] = {
+                0, 14, 15, 16, 17, 18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37
+            };
+            enum { NSEASONS = sizeof season_nums / sizeof season_nums[0] };
+            int si = 0;
+            for (int i = 0; i < NSEASONS; i++) {
+                if (season_nums[i] == g_settings.d3_season) { si = i; break; }
+            }
+            if (opt_choice("Season", &si, seasons, NSEASONS, 0,
+                           "Enables offline seasonal play and allows creating seasonal heroes. "
+                           "Change this on the title screen before starting a game.", false)) {
+                g_settings.d3_season = season_nums[si];
+                d3_season_mark_dirty();
+            }
+
+            static const char *themes[] = {
+                "Off",
+                "Auto (Match Season)",
+                "Double Rift Keystones",
+                "Double Blood Shards",
+                "S14: Double Treasure Goblins",
+                "S15: Double Bounty Bags",
+                "S16: Royal Grandeur",
+                "S17: Legacy of Nightmares",
+                "S18: Triune's Will",
+                "S19/35: Pandemonium",
+                "S20/31/37: Kanai Powers",
+                "S21: Trials of Tempests",
+                "S22/33: Shadow Clones",
+                "S22/33: 4th Kanai's Cube Slot",
+                "S24/32: Ethereal Items",
+                "S25/30/36: Soul Shards",
+                "S26: Echoing Nightmares",
+                "S27/34: Sanctified Items",
+                "S28: Altar of Rites (Dark Alchemy)",
+                "S29: Visions of Enmity"
+            };
+            enum { NTHEMES = sizeof themes / sizeof themes[0] };
+            int ti = (g_settings.d3_theme >= 0 && g_settings.d3_theme < NTHEMES) ? g_settings.d3_theme : 0;
+            if (opt_choice("Season theme", &ti, themes, NTHEMES, 1,
+                           "Community event buff active in game. Auto matches the selected season's theme; "
+                           "or pick any theme to apply to all heroes.", false)) {
+                g_settings.d3_theme = ti;
+                d3_season_mark_dirty();
+            }
+        }
+
         opt_end();
         return;
     }  // (the rows below are Link's Awakening's)

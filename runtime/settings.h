@@ -97,6 +97,9 @@ typedef struct {
     char rando_seed[128];  // active randomizer seed (rando/<name>/), empty = vanilla
     char player_name[33];  // the player's name in the game (its user profile nickname, services/acc.c); empty = the PC's user name
     char rando_options[48];  // the Randomizer tab's New seed options: a seed ID without its random part (empty = defaults)
+    // Diablo III 离线赛季与赛季主题 (runtime/hle/d3_season.c)
+    int d3_season;       // 0 = 关闭, 1..99 = 离线赛季号 (如 28 = 庇护之地仪式, 37 = 禁断档案库)
+    int d3_theme;        // 0 = 关闭, 1 = 自动匹配当前赛季主题, 2..19 = 指定单个赛季主题 Buff
 } Settings;
 
 

@@ -10,6 +10,7 @@ own game files and never shared). Run again after the game code is generated ane
 import os
 import shutil
 import sys
+import re
 
 GEN = r'<project folder>\src\d3recomp\generated\main'
 BACKUP = r'<project folder>\backups\generated'
@@ -187,6 +188,56 @@ UPGRADES = [
      '    { int h_ = d3_menu_hidden((uint32_t)c->x[0], (uint32_t)c->x[1]); if (h_) { c->x[0] = h_ == 2; return; } }  /* d3_gen_patch.py */\n'),
 ]
 
+SEASON_DECL = 'int d3_offline_season_num(void);  /* d3_gen_patch.py */\n'
+
+# (规则名称, 探测特征字符串, 正则匹配模式, 替换字符串)
+SEASON_RULES = [
+    # 1. IsSignedInOnline (main+0x56b10) -> 开启离线赛季时直接返回 1
+    ('IsSignedInOnline',
+     'void f_7000056b10(Cpu *c)',
+     r'(void f_7000056b10\(Cpu \*c\) \{\n    FN_ENTER\(0x7000056b10ull\);\n)',
+     r'\1    if (d3_offline_season_num() > 0) { c->x[0] = 1; return; }  /* d3_gen_patch.py */\n'),
+
+    # 2. ValidateHeroForPartyMember (main+0x1bf5f0) -> 开启离线赛季时直接返回 0（无错误）
+    ('ValidateHeroForPartyMember',
+     'void f_70001bf5f0(Cpu *c)',
+     r'(void f_70001bf5f0\(Cpu \*c\) \{\n    FN_ENTER\(0x70001bf5f0ull\);\n)',
+     r'\1    if (d3_offline_season_num() > 0) { c->x[0] = 0; return; }  /* d3_gen_patch.py */\n'),
+
+    # 3. IsSeasonsInitialized (main+0x5ff0c: and w0, w8, #1) -> 强制返回 1
+    ('IsSeasonsInitialized',
+     'L_700005ff0c:',
+     r'(L_700005ff0c:;\n)([^\n]+\n)',
+     r'\1    if (d3_offline_season_num() > 0) { c->x[0] = 1; } else { \2    }  /* d3_gen_patch.py */\n'),
+
+    # 4. 创建赛季角色确认回调 (main+0x351ccc: b.ne -> mov w1, #1)
+    ('SeasonConfirmCallback',
+     'L_7000351ccc:',
+     r'(L_7000351ccc:;\n)([^\n]+\n)',
+     r'\1    if (d3_offline_season_num() > 0) { c->x[1] = 1; } else { \2    }  /* d3_gen_patch.py */\n'),
+
+    # 5. SetGameParamsForHero (main+0x1bd140: ldr w21, [x8, #0x90]) -> 写入设定的赛季号
+    ('SetGameParamsForHero',
+     'L_70001bd140:',
+     r'(L_70001bd140:;\n)([^\n]+\n)',
+     r'\1    if (d3_offline_season_num() > 0) { c->x[21] = (uint32_t)d3_offline_season_num(); } else { \2    }  /* d3_gen_patch.py */\n'),
+]
+
+def apply_season_patches(fn, s):
+    changed = False
+    for name, probe, pat, repl in SEASON_RULES:
+        if probe not in s or f'/* d3_gen_patch.py: {name} */' in s:
+            continue
+        s_new, n = re.subn(pat, repl.replace('/* d3_gen_patch.py */', f'/* d3_gen_patch.py: {name} */'), s, count=1)
+        if n != 1:
+            raise SystemExit(f'd3_gen_patch: {fn}: {name} ({probe}) matched {n} times')
+        s = s_new
+        changed = True
+    if changed and SEASON_DECL not in s:
+        i = s.index('\n', s.index('#include "simd.h"')) + 1
+        s = s[:i] + SEASON_DECL + s[i:]
+    return s
+
 
 def main():
     os.makedirs(BACKUP, exist_ok=True)
@@ -272,4 +323,5 @@ def apply_text(fn, s):
         if s.count(old) != 1:
             raise SystemExit(f'd3_gen_patch: {fn}: anchor not found once')
         s = add_decl(s.replace(old, new, 1), decl)
+    s = apply_season_patches(fn, s)
     return s

@@ -925,6 +925,7 @@ static void fill_state(Cpu *c) {
     }
 d3_skip_ticks:;
     if (game_is_d3()) { extern void d3_ui_sound_run(Cpu *c); d3_ui_sound_run(c); }  // (our menu's clicks: d3_menu.c)
+    if (game_is_d3()) { extern void d3_season_run(Cpu *c); d3_season_run(c); }
     if (game_is_d3()) { extern void d3_music_tick(Cpu *c); d3_music_tick(c); }  // (Music volume: d3_volume.c)
     bool menu = menu_input_captured();  // the overlay menu / name entry has the controls (typing there isn't for the game)
     uint64_t held = key_buttons | pad_buttons;

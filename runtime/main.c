@@ -156,6 +156,7 @@ static void boot(const char *root) {
     loader_load(exefs);
     { extern void d3_patch_program_strings(void); d3_patch_program_strings(); }  // (Diablo III: runtime/hle/d3_text.c)
     { extern void d3_fonts_init(void); d3_fonts_init(); }  // (Diablo III: its fonts saved for our menu, hle/d3_fonts.c)
+    { extern void d3_season_init(void); d3_season_init(); }
     rando_boot();  // the chosen seed's data patches go into the freshly loaded module
     { extern void settings_load(void); settings_load(); }
     kernel_init();

@@ -48,6 +48,8 @@ Settings g_settings = {
     .frame_rate = 60,
     .game_fxaa = 0,
     .upscaler_auto = true,
+    .d3_season = 0,
+    .d3_theme = 1,  // 1 = Auto (Match Season)，开启赛季时自动启用对应主题，关闭赛季时自动无效果
     .res_auto = true,
     .livesplit_host = "localhost:16834",
 #ifndef __APPLE__
@@ -255,6 +257,8 @@ void settings_load(void) {
         else if (!strcmp(key, "livesplit")) g_settings.livesplit = atoi(val) != 0;
         else if (!strcmp(key, "rando_options")) strlcpy(g_settings.rando_options, val, sizeof g_settings.rando_options);
         else if (!strcmp(key, "player_name")) strlcpy(g_settings.player_name, val, sizeof g_settings.player_name);
+        else if (!strcmp(key, "d3_season")) { int v = atoi(val); g_settings.d3_season = (v >= 0 && v <= 99) ? v : 0; }
+        else if (!strcmp(key, "d3_theme")) { int v = atoi(val); g_settings.d3_theme = (v >= 0 && v <= 19) ? v : 1; }
         else if (!strcmp(key, "livesplit_host")) strlcpy(g_settings.livesplit_host, val, sizeof g_settings.livesplit_host);
         else if (!strcmp(key, "tunic")) col_parse(&g_settings.tunic, val);  // (colour rows: runtime/cosmetic_colour.c)
         else if (!strcmp(key, "hearts")) col_parse(&g_settings.hearts, val);
@@ -355,5 +359,7 @@ void settings_save(void) {
     fprintf(f, "rando_seed = %s\n", g_settings.rando_seed);
     if (g_settings.rando_options[0]) fprintf(f, "rando_options = %s\n", g_settings.rando_options);
     if (g_settings.player_name[0]) fprintf(f, "player_name = %s\n", g_settings.player_name);
+    fprintf(f, "d3_season = %d\n", g_settings.d3_season);
+    fprintf(f, "d3_theme = %d\n", g_settings.d3_theme);
     fclose(f);
 }
