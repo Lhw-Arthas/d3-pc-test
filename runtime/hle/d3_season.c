@@ -108,9 +108,9 @@ static void call_xvar_bool(Cpu *c, uint32_t off, int val) {
     uint64_t addr = MAIN_BASE + off;
     if ((*(volatile uint8_t *)(uintptr_t)(addr + 0xb0) & 1) == (val & 1)) return;
     Cpu save = *c;
-    c->x = addr;
-    c->x = (uint64_t)(val & 1);
-    c->x = 3;
+    c->x[0] = addr;
+    c->x[1] = (uint64_t)(val & 1);
+    c->x[2] = 3;
     guest_call(c, MAIN_BASE + OFF_BOOL_SET);
     *c = save;
 }
@@ -119,9 +119,9 @@ static void call_xvar_u32(Cpu *c, uint32_t off, uint32_t val) {
     uint64_t addr = MAIN_BASE + off;
     if (*(volatile uint32_t *)(uintptr_t)(addr + 0xb0) == val) return;
     Cpu save = *c;
-    c->x = addr;
-    c->x = val;
-    c->x = 3;
+    c->x[0] = addr;
+    c->x[1] = val;
+    c->x[2] = 3;
     guest_call(c, MAIN_BASE + OFF_U32_SET);
     *c = save;
 }
