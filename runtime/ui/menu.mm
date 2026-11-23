@@ -44,6 +44,7 @@ void input_reset(void);
 void save_editor_draw(float scale);  // save_editor.mm
 extern "C" int game_in_play(void);  // hle/warp.c
 void save_editor_on_open(void);
+void d3_season_mark_dirty(void);  // <--- 加在这里
 void rando_tab_draw(float scale);
 bool warp_tab_draw(float scale);  // warp_tab.mm: true when a warp started
 extern "C" void cheats_draw(float scale);  // cheats.mm
@@ -831,7 +832,6 @@ static void tab_display(void) {
                  "keep their own names). Empty: this PC's user name. Shows from the next start of the game.");
 
         // ---> 在这里插入离线赛季与赛季主题菜单 <---
-        extern "C" void d3_season_mark_dirty(void);
         opt_section("Offline Season");
         {
             static const char *seasons[] = {
