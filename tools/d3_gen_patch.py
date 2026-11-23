@@ -220,6 +220,12 @@ SEASON_RULES = [
      'L_70001bd140:',
      r'(L_70001bd140:;\n)([^\n]+\n)',
      r'\1    if (d3_offline_season_num() > 0) { c->x[21] = (uint32_t)d3_offline_season_num(); } else { \2    }  /* d3_gen_patch.py */\n'),
+
+    # 6. 赛季在线服务状态检查 (main+0x72e0a0): 离线赛季开启时返回 1 (已连接)
+    ('SeasonServiceAvailable',
+     'void f_700072e0a0(Cpu *c) {',
+     r'(void f_700072e0a0\(Cpu \*c\) \{\n(?:    FN_ENTER[^\n]*\n)?)',
+     r'\1    if (d3_offline_season_num() > 0) { c->x[0] = 1; return; }  /* d3_gen_patch.py */\n'),
 ]
 
 def apply_season_patches(fn, s):
