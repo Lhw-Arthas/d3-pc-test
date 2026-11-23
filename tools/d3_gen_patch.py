@@ -226,6 +226,13 @@ SEASON_RULES = [
      'void f_700072e0a0(Cpu *c) {',
      r'(void f_700072e0a0\(Cpu \*c\) \{\n(?:    FN_ENTER[^\n]*\n)?)',
      r'\1    if (d3_offline_season_num() > 0) { c->x[0] = 1; return; }  /* d3_gen_patch.py */\n'),
+
+    # 7. GetSeasonNum (main+0x72e090): 离线赛季开启时直接返回当前设置的赛季号
+    ('GetSeasonNum',
+     'void f_700072e090(Cpu *c) {',
+     r'(void f_700072e090\(Cpu \*c\) \{\n(?:    FN_ENTER[^\n]*\n)?)',
+     r'\1    if (d3_offline_season_num() > 0) { c->x = (uint32_t)d3_offline_season_num(); return; }  /* d3_gen_patch.py */\n'),
+    
 ]
 
 def apply_season_patches(fn, s):
