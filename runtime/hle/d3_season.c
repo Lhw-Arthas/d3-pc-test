@@ -103,8 +103,10 @@ static const d3_season_cfg_t *g_cfg = &k_cfg_277;
 static _Atomic bool g_dirty = true;
 RT_ON_RESET(d3_season_reset) { atomic_store(&g_dirty, true); }
 
+// 供 menu.mm 主动触发立即刷新
 void d3_season_mark_dirty(void) { atomic_store(&g_dirty, true); }
 
+// 供 d3_gen_patch.py / d3_gen_patch_276.py 生成的代码调用
 int d3_offline_season_num(void) {
     int s = g_settings.d3_season;
     return (s >= 1 && s <= 99) ? s : 0;
@@ -123,6 +125,7 @@ static uint32_t current_buff_mask(int season) {
     return mask;
 }
 
+// 在 main.c 的 boot() 中调用：支持环境变量作为初始默认值 (支持逗号分隔多选，如 D3_THEME=alchemy,nesting,ethereal)
 void d3_season_init(void) {
     if (!game_is_d3()) return;
 
@@ -144,7 +147,7 @@ void d3_season_init(void) {
             g_settings.d3_theme_auto = false;
             g_settings.d3_themes_mask = 0;
         } else {
-            char buf;
+            char buf[256];
             snprintf(buf, sizeof buf, "%s", et);
             g_settings.d3_theme_auto = false;
             g_settings.d3_themes_mask = 0;
@@ -175,9 +178,9 @@ static void call_xvar_bool_addr(Cpu *c, uint64_t addr, int val) {
     if (addr < MAIN_BASE) return;
     if ((*(volatile uint8_t *)(uintptr_t)(addr + 0xb0) & 1) == (val & 1)) return;
     Cpu save = *c;
-    c->x = addr;
-    c->x = (uint64_t)(val & 1);
-    c->x = 3;
+    c->x[0] = addr;
+    c->x[1] = (uint64_t)(val & 1);
+    c->x[2] = 3;
     guest_call(c, MAIN_BASE + g_cfg->bool_set);
     *c = save;
 }
@@ -186,9 +189,9 @@ static void call_xvar_u32_addr(Cpu *c, uint64_t addr, uint32_t val) {
     if (addr < MAIN_BASE) return;
     if (*(volatile uint32_t *)(uintptr_t)(addr + 0xb0) == val) return;
     Cpu save = *c;
-    c->x = addr;
-    c->x = val;
-    c->x = 3;
+    c->x[0] = addr;
+    c->x[1] = val;
+    c->x[2] = 3;
     guest_call(c, MAIN_BASE + g_cfg->u32_set);
     *c = save;
 }
@@ -238,7 +241,7 @@ static void apply_xvars(Cpu *c) {
 void d3_season_run(Cpu *c) {
     static unsigned polls = 0;
     bool need = atomic_exchange(&g_dirty, false);
-    if (!need && (++polls % 180 != 0)) return;
+    if (!need && (++polls % 180 != 0)) return; // 菜单改动时立即应用，平时每 ~3 秒维护一次
     if (g_settings.d3_season == 0 && !g_settings.d3_theme_auto && g_settings.d3_themes_mask == 0 && !need) return;
     apply_xvars(c);
 }
