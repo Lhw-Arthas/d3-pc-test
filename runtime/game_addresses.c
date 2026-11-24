@@ -1,7 +1,6 @@
 // The game-address tables of every supported game version and their selection by build ID (game_addresses.h).
 #include "game_addresses.h"
 
-#include <cstddef>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
