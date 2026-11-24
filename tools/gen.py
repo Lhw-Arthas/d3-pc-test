@@ -492,6 +492,7 @@ HOOKS, PATCHES = {}, {}
 
 # Diablo III: Eternal Collection 2.7.7 (update v1441792) main program build ID
 D3_MAIN_BUILD_ID = '2607A74F5DF7754CC0357B5DF7E496931355D8CA'
+D3_276_MAIN_BUILD_ID = '9B9E182991F3F5B5F21746646854FA803B6D39A5'
 
 import json as _json
 import os as _os
@@ -537,11 +538,18 @@ def main():
     t0 = time.time()
     m = Module(args.name, args.nso, args.base, args.simd)
     d3 = args.name == 'main' and m.nso.build_id.upper().startswith(D3_MAIN_BUILD_ID)
+    d3_276 = args.name == 'main' and m.nso.build_id.upper().startswith(D3_276_MAIN_BUILD_ID)
     if d3:  # Diablo III: no Link's Awakening address table or patches; its own small ones (d3_gen_patch.py)
         global D3_PATCH
         version = None
         import d3_gen_patch
         D3_PATCH = d3_gen_patch
+        print(f'{args.name}: Diablo III (build {m.nso.build_id[:16]}), Diablo III patches', file=sys.stderr)
+    if d3_276:  # Diablo III: no Link's Awakening address table or patches; its own small ones (d3_gen_patch_276.py)
+        global D3_PATCH
+        version = None
+        import d3_gen_patch_276
+        D3_PATCH = d3_gen_patch_276
         print(f'{args.name}: Diablo III (build {m.nso.build_id[:16]}), Diablo III patches', file=sys.stderr)
     elif args.name == 'main':
         global HOOKS, PATCHES
@@ -672,6 +680,8 @@ def main():
         f.write(f'const uint64_t {args.name}_fn_count = {len(order)};\n')
         write_if_changed(os.path.join(args.outdir, f'{args.name}_table.c'), f.getvalue())
     if d3:
+        write_if_changed(os.path.join(args.outdir, 'main_build_id.txt'), D3_MAIN_BUILD_ID + '\n')
+    if d3_276:
         write_if_changed(os.path.join(args.outdir, 'main_build_id.txt'), D3_MAIN_BUILD_ID + '\n')
     elif args.name == 'main':  # (what this code was generated from: the Makefile's game code library id, GAMELIB_BUILD_ID)
         write_if_changed(os.path.join(args.outdir, 'main_build_id.txt'), game_addresses.VERSIONS[version][1] + '\n')
