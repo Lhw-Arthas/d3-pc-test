@@ -31,7 +31,7 @@
 #define D3_AOC_TID 0x01001B300B9BF000ull
 static const char D3_BUILD_ID[] = "2607a74f5df7754cc0357b5df7e496931355d8ca";  // update 2.7.7 (v1441792)
 static const char D3_276_BUILD_ID[] = "9b9e182991f3f5b5f21746646854fa803b6d39a5";  // update 2.7.7 (v1441792)
-static const unsigned long long D3_ROMFS_BYTES = 17144415892ull;  // its merged romfs (37 files)
+static const unsigned long long D3_ROMFS_BYTES = 17144107719ull;  // its merged romfs (37 files)
 
 static void out(const char *kind, const char *fmt, ...) {
     char b[1200];
