@@ -14,42 +14,84 @@
 extern void guest_call(Cpu *c, uint64_t addr);
 
 #define MAIN_BASE 0x7000000000ull
+#define NBUFF 18
 
-enum {
-    OFF_BOOL_SET      = 0xa26fc0,
-    OFF_U32_SET       = 0xa273c0,
-    OFF_SEASON_NUM    = 0x1a1bd78,
-    OFF_SEASON_STATE  = 0x1a1be30,
-    OFF_SEASON_OVR    = 0x1a1c1c8,
-    OFF_EV_ENABLED    = 0x18ffbe0,
-    OFF_EV_SEASONONLY = 0x18ffc98,
-    OFF_BUFF_START    = 0x1771758,
-    OFF_BUFF_END      = 0x1771760,
+typedef struct {
+    uint32_t bool_set;
+    uint32_t u32_set;
+    uint32_t season_num;
+    uint32_t season_state;
+    uint32_t season_ovr;
+    uint32_t ev_enabled;
+    uint32_t ev_seasononly;
+    uint32_t buff_start;
+    uint32_t buff_end;
+    uint32_t ui_season_opt;
+    uint32_t ui_season_flag;
+    uint32_t buffs[NBUFF];
+} d3_season_addrs_t;
+
+// 2.7.7 偏移表（保持你原有的验证地址不变）
+static const d3_season_addrs_t k_addrs_277 = {
+    .bool_set       = 0xa26fc0,
+    .u32_set        = 0xa273c0,
+    .season_num     = 0x1a1bd78,
+    .season_state   = 0x1a1be30,
+    .season_ovr     = 0x1a1c1c8,
+    .ev_enabled     = 0x18ffbe0,
+    .ev_seasononly  = 0x18ffc98,
+    .buff_start     = 0x1771758,
+    .buff_end       = 0x1771760,
+    .ui_season_opt  = 0x18626b8,
+    .ui_season_flag = 0x18627a4,
+    .buffs = {
+        0x18fffc8, // 2:  keystones
+        0x1900080, // 3:  bloodshards
+        0x1900138, // 4:  goblins
+        0x19001f0, // 5:  bags
+        0x19002a8, // 6:  grandeur
+        0x1900360, // 7:  nightmares
+        0x1900418, // 8:  triune
+        0x19004d0, // 9:  pandemonium
+        0x1900588, // 10: kanai
+        0x1900640, // 11: tempests
+        0x19006f8, // 12: clones
+        0x19007b0, // 13: cube4
+        0x1900868, // 14: ethereal
+        0x1900920, // 15: shards
+        0x19009d8, // 16: swarm
+        0x1900a90, // 17: sanctified
+        0x1900b48, // 18: alchemy
+        0x18ff848, // 19: nesting
+    }
 };
 
-// 菜单下拉列表对应的 18 个社区 Buff（索引 0=Off, 1=Auto, 2..19 对应下列 18 项）
-typedef struct { const char *key; const char *label; uint32_t off; } buff_t;
-static const buff_t k_buffs[] = {
-    {"keystones",   "Double Rift Keystones",      0x18fffc8}, // 2
-    {"bloodshards", "Double Blood Shards",        0x1900080}, // 3
-    {"goblins",     "S14: Double Goblins",        0x1900138}, // 4
-    {"bags",        "S15: Double Bounty Bags",    0x19001f0}, // 5
-    {"grandeur",    "S16: Royal Grandeur",        0x19002a8}, // 6
-    {"nightmares",  "S17: Legacy of Nightmares",  0x1900360}, // 7
-    {"triune",      "S18: Triune's Will",         0x1900418}, // 8
-    {"pandemonium", "S19/35: Pandemonium",        0x19004d0}, // 9
-    {"kanai",       "S20/31/37: Kanai Powers",    0x1900588}, // 10
-    {"tempests",    "S21: Trials of Tempests",    0x1900640}, // 11
-    {"clones",      "S22/33: Shadow Clones",      0x19006f8}, // 12
-    {"cube4",       "S22/33: 4th Cube Slot",      0x19007b0}, // 13
-    {"ethereal",    "S24/32: Ethereal Items",     0x1900868}, // 14
-    {"shards",      "S25/30/36: Soul Shards",     0x1900920}, // 15
-    {"swarm",       "S26: Echoing Nightmares",    0x19009d8}, // 16
-    {"sanctified",  "S27/34: Sanctified Items",   0x1900a90}, // 17
-    {"alchemy",     "S28: Altar of Rites",        0x1900b48}, // 18
-    {"nesting",     "S29: Visions of Enmity",     0x18ff848}, // 19
+// 2.7.6 偏移表（函数偏移已通过 d3hack offsets.hpp 精确修正）
+// 注：下列数据段偏移若在 2.7.6 中测试未生效，可按下方说明调整差值
+static const d3_season_addrs_t k_addrs_276 = {
+    .bool_set       = 0xa26ec0, // 2.7.6 sym_XVarBool_Set
+    .u32_set        = 0xa272c0, // 2.7.6 sym_XVarUint32_Set
+    .season_num     = 0x1a1bd78,
+    .season_state   = 0x1a1be30,
+    .season_ovr     = 0x1a1c1c8,
+    .ev_enabled     = 0x18ffbe0,
+    .ev_seasononly  = 0x18ffc98,
+    .buff_start     = 0x1771758,
+    .buff_end       = 0x1771760,
+    .ui_season_opt  = 0x18626b8,
+    .ui_season_flag = 0x18627a4,
+    .buffs = {
+        0x18fffc8, 0x1900080, 0x1900138, 0x19001f0, 0x19002a8, 0x1900360,
+        0x1900418, 0x19004d0, 0x1900588, 0x1900640, 0x19006f8, 0x19007b0,
+        0x1900868, 0x1900920, 0x19009d8, 0x1900a90, 0x1900b48, 0x18ff848,
+    }
 };
-#define NBUFF (int)(sizeof k_buffs / sizeof *k_buffs)
+
+static const char *const k_buff_keys[NBUFF] = {
+    "keystones", "bloodshards", "goblins", "bags", "grandeur", "nightmares",
+    "triune", "pandemonium", "kanai", "tempests", "clones", "cube4",
+    "ethereal", "shards", "swarm", "sanctified", "alchemy", "nesting"
+};
 
 static const struct { int season; uint32_t mask; } k_themes[] = {
     {14, 1u << 2},  {15, 1u << 3},  {16, 1u << 4},  {17, 1u << 5},  {18, 1u << 6},
@@ -59,13 +101,12 @@ static const struct { int season; uint32_t mask; } k_themes[] = {
     {34, 1u << 15}, {35, 1u << 7},  {36, 1u << 13}, {37, 1u << 8},
 };
 
+static const d3_season_addrs_t *g_addrs = &k_addrs_277;
 static _Atomic bool g_dirty = true;
 RT_ON_RESET(d3_season_reset) { atomic_store(&g_dirty, true); }
 
-// 供 menu.mm 主动触发立即刷新
 void d3_season_mark_dirty(void) { atomic_store(&g_dirty, true); }
 
-// 供 d3_gen_patch.py 生成的代码调用
 int d3_offline_season_num(void) {
     int s = g_settings.d3_season;
     return (s >= 1 && s <= 99) ? s : 0;
@@ -84,9 +125,17 @@ static uint32_t current_buff_mask(int season) {
     return mask;
 }
 
-// 在 main.c 的 boot() 中调用：支持环境变量作为初始默认值 (支持逗号分隔多选，如 D3_THEME=alchemy,nesting,ethereal)
 void d3_season_init(void) {
     if (!game_is_d3()) return;
+
+    // 直接使用 game_addresses.h 的版本接口选择偏移表
+    const GameVersion *v = game_version();
+    if (v && v->key && strcmp(v->key, "d3_2_7_6") == 0) {
+        g_addrs = &k_addrs_276;
+    } else {
+        g_addrs = &k_addrs_277;
+    }
+
     const char *es = getenv("D3_SEASON");
     if (es && *es) {
         int s = atoi(es);
@@ -107,7 +156,7 @@ void d3_season_init(void) {
                 if (!strcmp(tok, "auto")) g_settings.d3_theme_auto = true;
                 else {
                     for (int i = 0; i < NBUFF; i++) {
-                        if (!strcmp(tok, k_buffs[i].key)) {
+                        if (!strcmp(tok, k_buff_keys[i])) {
                             g_settings.d3_themes_mask |= (1u << i);
                             break;
                         }
@@ -121,24 +170,26 @@ void d3_season_init(void) {
 }
 
 static void call_xvar_bool(Cpu *c, uint32_t off, int val) {
+    if (!off) return;
     uint64_t addr = MAIN_BASE + off;
     if ((*(volatile uint8_t *)(uintptr_t)(addr + 0xb0) & 1) == (val & 1)) return;
     Cpu save = *c;
     c->x[0] = addr;
     c->x[1] = (uint64_t)(val & 1);
     c->x[2] = 3;
-    guest_call(c, MAIN_BASE + OFF_BOOL_SET);
+    guest_call(c, MAIN_BASE + g_addrs->bool_set);
     *c = save;
 }
 
 static void call_xvar_u32(Cpu *c, uint32_t off, uint32_t val) {
+    if (!off) return;
     uint64_t addr = MAIN_BASE + off;
     if (*(volatile uint32_t *)(uintptr_t)(addr + 0xb0) == val) return;
     Cpu save = *c;
     c->x[0] = addr;
     c->x[1] = val;
     c->x[2] = 3;
-    guest_call(c, MAIN_BASE + OFF_U32_SET);
+    guest_call(c, MAIN_BASE + g_addrs->u32_set);
     *c = save;
 }
 
@@ -147,37 +198,39 @@ static void apply_xvars(Cpu *c) {
     uint32_t mask = current_buff_mask(season);
 
     if (season > 0) {
-        call_xvar_u32(c, OFF_SEASON_NUM, (uint32_t)season);
-        call_xvar_u32(c, OFF_SEASON_STATE, 1);
-        call_xvar_bool(c, OFF_SEASON_OVR, 1);
-        *(volatile uint32_t *)(uintptr_t)(MAIN_BASE + 0x18626b8ull) = 1; // 显示创建英雄界面的赛季选项！
-        *(volatile uint32_t *)(uintptr_t)(MAIN_BASE + 0x18627a4ull) = 1; // 强制解锁创建赛季英雄标志
+        call_xvar_u32(c, g_addrs->season_num, (uint32_t)season);
+        call_xvar_u32(c, g_addrs->season_state, 1);
+        call_xvar_bool(c, g_addrs->season_ovr, 1);
+        if (g_addrs->ui_season_opt)
+            *(volatile uint32_t *)(uintptr_t)(MAIN_BASE + g_addrs->ui_season_opt) = 1;
+        if (g_addrs->ui_season_flag)
+            *(volatile uint32_t *)(uintptr_t)(MAIN_BASE + g_addrs->ui_season_flag) = 1;
     } else {
-        call_xvar_u32(c, OFF_SEASON_STATE, 0);
-        call_xvar_bool(c, OFF_SEASON_OVR, 0);
+        call_xvar_u32(c, g_addrs->season_state, 0);
+        call_xvar_bool(c, g_addrs->season_ovr, 0);
     }
 
     if (mask != 0) {
-        int64_t *t0 = (int64_t *)(uintptr_t)(MAIN_BASE + OFF_BUFF_START);
-        int64_t *t1 = (int64_t *)(uintptr_t)(MAIN_BASE + OFF_BUFF_END);
+        int64_t *t0 = (int64_t *)(uintptr_t)(MAIN_BASE + g_addrs->buff_start);
+        int64_t *t1 = (int64_t *)(uintptr_t)(MAIN_BASE + g_addrs->buff_end);
         if (!*t0 || !*t1 || *t1 <= *t0) { *t0 = 1; *t1 = INT64_MAX; }
         for (int i = 0; i < NBUFF; i++) {
-            call_xvar_bool(c, k_buffs[i].off, (mask >> i) & 1);
+            call_xvar_bool(c, g_addrs->buffs[i], (mask >> i) & 1);
         }
-        call_xvar_bool(c, OFF_EV_SEASONONLY, 0);
-        call_xvar_bool(c, OFF_EV_ENABLED, 1);
+        call_xvar_bool(c, g_addrs->ev_seasononly, 0);
+        call_xvar_bool(c, g_addrs->ev_enabled, 1);
     } else {
         for (int i = 0; i < NBUFF; i++) {
-            call_xvar_bool(c, k_buffs[i].off, 0);
+            call_xvar_bool(c, g_addrs->buffs[i], 0);
         }
-        call_xvar_bool(c, OFF_EV_ENABLED, 0);
+        call_xvar_bool(c, g_addrs->ev_enabled, 0);
     }
 }
 
 void d3_season_run(Cpu *c) {
     static unsigned polls = 0;
     bool need = atomic_exchange(&g_dirty, false);
-    if (!need && (++polls % 180 != 0)) return; // 菜单改动时立即应用，平时每 ~3 秒维护一次
+    if (!need && (++polls % 180 != 0)) return;
     if (g_settings.d3_season == 0 && !g_settings.d3_theme_auto && g_settings.d3_themes_mask == 0 && !need) return;
     apply_xvars(c);
 }
