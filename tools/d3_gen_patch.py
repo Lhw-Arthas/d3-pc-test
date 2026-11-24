@@ -8,6 +8,7 @@ own game files and never shared). Run again after the game code is generated ane
  11. main+0x7b7620 (the world step): counted for the 120 fps clock sync (hle/d3_clock.c).
 """
 import os
+import glob
 import shutil
 import sys
 import re
@@ -15,358 +16,345 @@ import re
 GEN = r'<project folder>\src\d3recomp\generated\main'
 BACKUP = r'<project folder>\backups\generated'
 
+# 格式: (anchor (必须全局唯一), text inserted after it, declaration added after the first #include block)
 PATCHES = [
-    # (file, anchor (must appear once), text inserted after it, declaration added after the first #include block)
     # 14. the game's event helpers (main+0x6900 signal / 0x6910 wait / 0x6920 timed wait): D3_CLOCK_LOG=4 logs the
     #     frame event's users (d3_clock.c)
-    ('main_000.c',
-     'void f_7000006900(Cpu *c) {\n    FN_ENTER(0x7000006900ull);\n',
+    ('void f_7000006900(Cpu *c) {\n    FN_ENTER(0x7000006900ull);\n',
      "    d3_lock_seen(c->x[0], 'S', c->x[30]);  /* d3_gen_patch.py */\n",
      'void d3_lock_seen(uint64_t m, int unlock, uint64_t lr);  /* d3_gen_patch.py */\n'),
-    ('main_000.c',
-     'void f_7000006910(Cpu *c) {\n    FN_ENTER(0x7000006910ull);\n',
+    ('void f_7000006910(Cpu *c) {\n    FN_ENTER(0x7000006910ull);\n',
      "    d3_lock_seen(c->x[0], 'W', c->x[30]);  /* d3_gen_patch.py */\n",
      'void d3_lock_seen(uint64_t m, int unlock, uint64_t lr);  /* d3_gen_patch.py */\n'),
-    ('main_000.c',
-     'void f_7000006920(Cpu *c) {\n    FN_ENTER(0x7000006920ull);\n',
+    ('void f_7000006920(Cpu *c) {\n    FN_ENTER(0x7000006920ull);\n',
      "    d3_lock_seen(c->x[1], 'T', c->x[30]);  /* d3_gen_patch.py */\n",
      'void d3_lock_seen(uint64_t m, int unlock, uint64_t lr);  /* d3_gen_patch.py */\n'),
     # 13. the game's lock / unlock helpers (main+0x68b0 / 0x68c0): D3_CLOCK_LOG=4 logs the world lock's users (d3_clock.c)
-    ('main_000.c',
-     'void f_70000068b0(Cpu *c) {\n    FN_ENTER(0x70000068b0ull);\n',
+    ('void f_70000068b0(Cpu *c) {\n    FN_ENTER(0x70000068b0ull);\n',
      '    d3_lock_seen(c->x[0], 0, c->x[30]);  /* d3_gen_patch.py */\n',
      'void d3_lock_seen(uint64_t m, int unlock, uint64_t lr);  /* d3_gen_patch.py */\n'),
-    ('main_000.c',
-     'void f_70000068c0(Cpu *c) {\n    FN_ENTER(0x70000068c0ull);\n',
+    ('void f_70000068c0(Cpu *c) {\n    FN_ENTER(0x70000068c0ull);\n',
      '    d3_lock_seen(c->x[0], 1, c->x[30]);  /* d3_gen_patch.py (unlock) */\n',
      'void d3_lock_seen(uint64_t m, int unlock, uint64_t lr);  /* d3_gen_patch.py */\n'),
     # 11. the game's world step (main+0x7b7620, entered once per 1/60 s step): counted (hle/d3_clock.c d3_tick_mark)
-    ('main_229.c',
-     'void f_70007b7620(Cpu *c) {\n    FN_ENTER(0x70007b7620ull);\n',
+    ('void f_70007b7620(Cpu *c) {\n    FN_ENTER(0x70007b7620ull);\n',
      '    d3_tick_mark();  /* d3_gen_patch.py */\n',
      'void d3_tick_mark(void);  /* d3_gen_patch.py */\n'),
-    ('main_117.c',
-     'void f_700035bf90(Cpu *c) {\n    FN_ENTER(0x700035bf90ull);\n',
+    # 1. main menu's "is this entry shown"
+    ('void f_700035bf90(Cpu *c) {\n    FN_ENTER(0x700035bf90ull);\n',
      '    { int h_ = d3_menu_hidden((uint32_t)c->x[0], (uint32_t)c->x[1]); if (h_) { c->x[0] = h_ == 2; return; } }  /* d3_gen_patch.py */\n',
      'int d3_menu_hidden(uint32_t menu, uint32_t id);  /* d3_gen_patch.py */\n'),
     # 5. the main menu's button handler (main+0x361870): entry 12 opens our settings menu (d3_menu.c d3_pc_settings_entry)
-    ('main_117.c',
-     '    { uint64_t ea = c->x[9] + (c->x[8] << 2); uint64_t v = LD32(ea); c->x[8] = (uint64_t)(v); }\nL_700036190c:;\n',
+    ('    { uint64_t ea = c->x[9] + (c->x[8] << 2); uint64_t v = LD32(ea); c->x[8] = (uint64_t)(v); }\nL_700036190c:;\n',
      '    { int r_ = d3_pc_settings_entry((uint32_t)c->x[8]); if (r_ < 0) goto L_7000361894; c->x[8] = (uint32_t)r_; }  /* d3_gen_patch.py */\n',
      'int d3_pc_settings_entry(uint32_t id);  /* d3_gen_patch.py */\n'),
     # 10. the main menu's entry labels by id (main+0x35bbf0): d3_menu.c d3_menu_label_id (Exit Game: ids shift)
-    ('main_117.c',
-     'void f_700035bbf0(Cpu *c) {\n    FN_ENTER(0x700035bbf0ull);\n',
+    ('void f_700035bbf0(Cpu *c) {\n    FN_ENTER(0x700035bbf0ull);\n',
      '    c->x[0] = d3_menu_label_id((uint32_t)c->x[0]);  /* d3_gen_patch.py */\n',
      'uint32_t d3_menu_label_id(uint32_t id);  /* d3_gen_patch.py */\n'),
     # 6. the game's "UI sound by number" (main+0x4e5f50): D3_LOG_UI_SOUNDS logs each (d3_menu.c d3_ui_sound_seen)
-    ('main_151.c',
-     'void f_70004e5f50(Cpu *c) {\n    FN_ENTER(0x70004e5f50ull);\n',
+    ('void f_70004e5f50(Cpu *c) {\n    FN_ENTER(0x70004e5f50ull);\n',
      '    d3_ui_sound_seen((uint32_t)c->x[0]);  /* d3_gen_patch.py */\n',
      'void d3_ui_sound_seen(uint32_t id);  /* d3_gen_patch.py */\n'),
     # 7. "play this sound" (main+0x315e20): D3_LOG_UI_SOUNDS logs each (d3_menu.c d3_ui_play_seen)
-    ('main_107.c',
-     'void f_7000315e20(Cpu *c) {\n    FN_ENTER(0x7000315e20ull);\n',
+    ('void f_7000315e20(Cpu *c) {\n    FN_ENTER(0x7000315e20ull);\n',
      '    d3_ui_play_seen((uint32_t)c->x[0], c->x[30]);  /* d3_gen_patch.py */\n',
      'void d3_ui_play_seen(uint32_t snd, uint64_t lr);  /* d3_gen_patch.py */\n'),
     # 8. FMOD ChannelGroup::setVolume (main+0xa4d720): the game's "Music" group gets Music volume x the game's value
     #    (runtime/hle/d3_volume.c d3_group_volume)
-    ('main_307.c',
-     'void f_7000a4d720(Cpu *c) {\n    FN_ENTER(0x7000a4d720ull);\n',
+    ('void f_7000a4d720(Cpu *c) {\n    FN_ENTER(0x7000a4d720ull);\n',
      '    d3_group_volume(c);  /* d3_gen_patch.py */\n',
      'void d3_group_volume(Cpu *c);  /* d3_gen_patch.py */\n'),
     # 4. zlib 1.2.3's inner decode loop (inflate_fast, main+0x12590): the host's version (runtime/hle/d3_inflate.c)
-    ('main_002.c',
-     'void f_7000012590(Cpu *c) {\n    FN_ENTER(0x7000012590ull);\n',
+    ('void f_7000012590(Cpu *c) {\n    FN_ENTER(0x7000012590ull);\n',
      '    if (d3_inflate_fast(c)) return;  /* d3_gen_patch.py */\n',
      '_Bool d3_inflate_fast(Cpu *c); void d3_inflate_check(Cpu *c);  /* d3_gen_patch.py */\n'),
 ]
-# 2. the "Disconnected from Diablo Network / Not Signed In" box: main menu (main+0x362884) and pause menu
-#    (main+0x2212b4) show it with SetVisible(1); d3_online_status_shown() decides instead (0 unless D3_MENU_ALL)
+
+# 格式: (old_text, new_text, declaration)
 REPLACES = [
-    # 16. the world (game simulation) thread's sleep between its steps (main+0x7c5cdc): above 60 fps it waits for the
-    #     next frame in which the game counts a step (hle/d3_clock.c d3_sim_wait)
-    ('main_230.c',
-     '    c->x[0] = (uint32_t)((uint32_t)c->x[21] - (uint32_t)c->x[8]);\n    c->x[30] = 0x70007c5ce0ull; f_7000006fb0(c);\nL_70007c5ce0:;\n',
-     '    c->x[0] = (uint32_t)((uint32_t)c->x[21] - (uint32_t)c->x[8]);\n    c->x[30] = 0x70007c5ce0ull; if (!d3_sim_wait((uint32_t)c->x[0])) f_7000006fb0(c);  /* d3_gen_patch.py */\nL_70007c5ce0:;\n',
-     'int d3_sim_wait(uint32_t ms);  /* d3_gen_patch.py */\n'),
-    # 15. THE 120 FPS FIX: the time the game hands its frame function (main+0x4c8890 -> main+0x40810) is ours above
-    #     60 fps (hle/d3_clock.c d3_frame_time; the game's own smoothed frame clock can settle on every second frame)
-    ('main_146.c',
-     'L_70004c8890:;\n    c->x[0] = (uint32_t)(0u | (uint32_t)c->x[19]);\n    c->x[30] = 0x70004c8898ull; f_7000040810(c);\n',
-     'L_70004c8890:;\n    { uint64_t t_ = c->x[19]; c->x[30] = 0x70004c8894ull; f_7000a49c30(c); c->x[19] = d3_frame_time((uint32_t)t_, (uint32_t)c->x[0], c->x[21]); }  /* d3_gen_patch.py */\n    c->x[0] = (uint32_t)(0u | (uint32_t)c->x[19]);\n    c->x[30] = 0x70004c8898ull; f_7000040810(c);\n',
-     'uint32_t d3_frame_time(uint32_t game_t, uint32_t now, uint64_t game);  /* d3_gen_patch.py */\n'),
-    # 12. the world thread's sleep between its steps (main+0x4c64ac): above 60 fps it waits for its place in the
-    #     frame slots instead (hle/d3_clock.c d3_world_wait)
-    ('main_146.c',
-     'L_70004c64ac:;\n    c->x[30] = 0x70004c64b0ull; f_7000006fb0(c);\n',
-     'L_70004c64ac:;\n    c->x[30] = 0x70004c64b0ull; if (!d3_world_wait((uint32_t)c->x[0])) f_7000006fb0(c);  /* d3_gen_patch.py */\n',
-     'int d3_world_wait(uint32_t ms);  /* d3_gen_patch.py */\n'),
-    ('main_117.c',
-     '    c->x[1] = (uint32_t)(0u | 0x1ull);\n    c->pc = c->x[8]; c->x[30] = 0x7000362888ull; rt_dispatch(c);\n',
-     '    c->x[1] = (uint32_t)(d3_online_status_shown());  /* d3_gen_patch.py */\n    c->pc = c->x[8]; c->x[30] = 0x7000362888ull; rt_dispatch(c);\n',
-     'int d3_online_status_shown(void);  /* d3_gen_patch.py */\n'),
-    ('main_077.c',
-     '    c->x[1] = (uint32_t)(0u | 0x1ull);\n    c->pc = c->x[8]; c->x[30] = 0x70002212b8ull; rt_dispatch(c);\n',
-     '    c->x[1] = (uint32_t)(d3_online_status_shown());  /* d3_gen_patch.py */\n    c->pc = c->x[8]; c->x[30] = 0x70002212b8ull; rt_dispatch(c);\n',
-     'int d3_online_status_shown(void);  /* d3_gen_patch.py */\n'),
-    # 2b. the season status line ("Not Signed In" with the leaf) of the main menu: SetVisible(1) at main+0x362a08 and
-    #     main+0x362ce8 -> d3_online_status_shown()
-    ('main_117.c',
-     '    c->x[1] = (uint32_t)(0u | 0x1ull);\n    c->pc = c->x[8]; c->x[30] = 0x7000362a0cull; rt_dispatch(c);\n',
-     '    c->x[1] = (uint32_t)(d3_online_status_shown());  /* d3_gen_patch.py */\n    c->pc = c->x[8]; c->x[30] = 0x7000362a0cull; rt_dispatch(c);\n',
-     'int d3_online_status_shown(void);  /* d3_gen_patch.py */\n'),
-    ('main_117.c',
-     '    c->x[1] = (uint32_t)(0u | 0x1ull);\n    c->pc = c->x[8]; c->x[30] = 0x7000362cecull; rt_dispatch(c);\n',
-     '    c->x[1] = (uint32_t)(d3_online_status_shown());  /* d3_gen_patch.py */\n    c->pc = c->x[8]; c->x[30] = 0x7000362cecull; rt_dispatch(c);\n',
-     'int d3_online_status_shown(void);  /* d3_gen_patch.py */\n'),
-    ('main_117.c',
-     '    c->x[1] = (uint32_t)((uint32_t)c->x[19] & (uint32_t)c->x[8]);\n'
-     '    { uint64_t ea = c->x[0] + 0x0ull; uint64_t v = LD64(ea); c->x[8] = (uint64_t)(v); }\n'
-     '    { uint64_t ea = c->x[8] + 0x50ull; uint64_t v = LD64(ea); c->x[8] = (uint64_t)(v); }\n'
-     '    c->pc = c->x[8]; c->x[30] = 0x7000362d20ull; rt_dispatch(c);\n',
-     '    c->x[1] = (uint32_t)((uint32_t)c->x[19] & (uint32_t)c->x[8] & (uint32_t)d3_online_status_shown());  /* d3_gen_patch.py */\n'
-     '    { uint64_t ea = c->x[0] + 0x0ull; uint64_t v = LD64(ea); c->x[8] = (uint64_t)(v); }\n'
-     '    { uint64_t ea = c->x[8] + 0x50ull; uint64_t v = LD64(ea); c->x[8] = (uint64_t)(v); }\n'
-     '    c->pc = c->x[8]; c->x[30] = 0x7000362d20ull; rt_dispatch(c);\n',
-     'int d3_online_status_shown(void);  /* d3_gen_patch.py */\n'),
-    # 2c. the season status box itself (SeasonStateNotification, handle main+0x1151210): SetVisible at main+0x3606a8
-    ('main_117.c',
-     '    c->x[1] = (uint32_t)(0u | (uint32_t)c->x[20]);\n    c->pc = c->x[8]; c->x[30] = 0x70003606acull; rt_dispatch(c);\n',
-     '    c->x[1] = (uint32_t)(0u | ((uint32_t)c->x[20] & (uint32_t)d3_online_status_shown()));  /* d3_gen_patch.py */\n'
-     '    c->pc = c->x[8]; c->x[30] = 0x70003606acull; rt_dispatch(c);\n',
-     'int d3_online_status_shown(void);  /* d3_gen_patch.py */\n'),
-    # 2d. pause menu (main+0x21f480 adds its entries with main+0x21f780): Network Settings, Challenges, Leaderboards,
-    #     Season Journey and Connect to Diablo Servers only when d3_options_tab_shown(3) (D3_MENU_ALL)
+ # 16. the world (game simulation) thread's sleep between its steps (main+0x7c5cdc): above 60 fps it waits for the
+ #     next frame in which the game counts a step (hle/d3_clock.c d3_sim_wait)
+ ('    c->x[0] = (uint32_t)((uint32_t)c->x[21] - (uint32_t)c->x[8]);\n    c->x[30] = 0x70007c5ce0ull; f_7000006fb0(c);\nL_70007c5ce0:;\n',
+  '    c->x[0] = (uint32_t)((uint32_t)c->x[21] - (uint32_t)c->x[8]);\n    c->x[30] = 0x70007c5ce0ull; if (!d3_sim_wait((uint32_t)c->x[0])) f_7000006fb0(c);  /* d3_gen_patch.py */\nL_70007c5ce0:;\n',
+  'int d3_sim_wait(uint32_t ms);  /* d3_gen_patch.py */\n'),
+ # 15. THE 120 FPS FIX: the time the game hands its frame function (main+0x4c8890 -> main+0x40810) is ours above
+ #     60 fps (hle/d3_clock.c d3_frame_time; the game's own smoothed frame clock can settle on every second frame)
+ ('L_70004c8890:;\n    c->x[0] = (uint32_t)(0u | (uint32_t)c->x[19]);\n    c->x[30] = 0x70004c8898ull; f_7000040810(c);\n',
+  'L_70004c8890:;\n    { uint64_t t_ = c->x[19]; c->x[30] = 0x70004c8894ull; f_7000a49c30(c); c->x[19] = d3_frame_time((uint32_t)t_, (uint32_t)c->x[0], c->x[21]); }  /* d3_gen_patch.py */\n    c->x[0] = (uint32_t)(0u | (uint32_t)c->x[19]);\n    c->x[30] = 0x70004c8898ull; f_7000040810(c);\n',
+  'uint32_t d3_frame_time(uint32_t game_t, uint32_t now, uint64_t game);  /* d3_gen_patch.py */\n'),
+ # 12. the world thread's sleep between its steps (main+0x4c64ac): above 60 fps it waits for its place in the
+ #     frame slots instead (hle/d3_clock.c d3_world_wait)
+ ('L_70004c64ac:;\n    c->x[30] = 0x70004c64b0ull; f_7000006fb0(c);\n',
+  'L_70004c64ac:;\n    c->x[30] = 0x70004c64b0ull; if (!d3_world_wait((uint32_t)c->x[0])) f_7000006fb0(c);  /* d3_gen_patch.py */\n',
+  'int d3_world_wait(uint32_t ms);  /* d3_gen_patch.py */\n'),
+ # 2. the "Disconnected from Diablo Network / Not Signed In" box
+ ('    c->x[1] = (uint32_t)(0u | 0x1ull);\n    c->pc = c->x[8]; c->x[30] = 0x7000362888ull; rt_dispatch(c);\n',
+  '    c->x[1] = (uint32_t)(d3_online_status_shown());  /* d3_gen_patch.py */\n    c->pc = c->x[8]; c->x[30] = 0x7000362888ull; rt_dispatch(c);\n',
+  'int d3_online_status_shown(void);  /* d3_gen_patch.py */\n'),
+ ('    c->x[1] = (uint32_t)(0u | 0x1ull);\n    c->pc = c->x[8]; c->x[30] = 0x70002212b8ull; rt_dispatch(c);\n',
+  '    c->x[1] = (uint32_t)(d3_online_status_shown());  /* d3_gen_patch.py */\n    c->pc = c->x[8]; c->x[30] = 0x70002212b8ull; rt_dispatch(c);\n',
+  'int d3_online_status_shown(void);  /* d3_gen_patch.py */\n'),
+ # 2b. the season status line ("Not Signed In" with the leaf) of the main menu
+ ('    c->x[1] = (uint32_t)(0u | 0x1ull);\n    c->pc = c->x[8]; c->x[30] = 0x7000362a0cull; rt_dispatch(c);\n',
+  '    c->x[1] = (uint32_t)(d3_online_status_shown());  /* d3_gen_patch.py */\n    c->pc = c->x[8]; c->x[30] = 0x7000362a0cull; rt_dispatch(c);\n',
+  'int d3_online_status_shown(void);  /* d3_gen_patch.py */\n'),
+ ('    c->x[1] = (uint32_t)(0u | 0x1ull);\n    c->pc = c->x[8]; c->x[30] = 0x7000362cecull; rt_dispatch(c);\n',
+  '    c->x[1] = (uint32_t)(d3_online_status_shown());  /* d3_gen_patch.py */\n    c->pc = c->x[8]; c->x[30] = 0x7000362cecull; rt_dispatch(c);\n',
+  'int d3_online_status_shown(void);  /* d3_gen_patch.py */\n'),
+ ('    c->x[1] = (uint32_t)((uint32_t)c->x[19] & (uint32_t)c->x[8]);\n'
+  '    { uint64_t ea = c->x[0] + 0x0ull; uint64_t v = LD64(ea); c->x[8] = (uint64_t)(v); }\n'
+  '    { uint64_t ea = c->x[8] + 0x50ull; uint64_t v = LD64(ea); c->x[8] = (uint64_t)(v); }\n'
+  '    c->pc = c->x[8]; c->x[30] = 0x7000362d20ull; rt_dispatch(c);\n',
+  '    c->x[1] = (uint32_t)((uint32_t)c->x[19] & (uint32_t)c->x[8] & (uint32_t)d3_online_status_shown());  /* d3_gen_patch.py */\n'
+  '    { uint64_t ea = c->x[0] + 0x0ull; uint64_t v = LD64(ea); c->x[8] = (uint64_t)(v); }\n'
+  '    { uint64_t ea = c->x[8] + 0x50ull; uint64_t v = LD64(ea); c->x[8] = (uint64_t)(v); }\n'
+  '    c->pc = c->x[8]; c->x[30] = 0x7000362d20ull; rt_dispatch(c);\n',
+  'int d3_online_status_shown(void);  /* d3_gen_patch.py */\n'),
+ # 2c. the season status box itself (SeasonStateNotification, handle main+0x1151210): SetVisible at main+0x3606a8
+ ('    c->x[1] = (uint32_t)(0u | (uint32_t)c->x[20]);\n    c->pc = c->x[8]; c->x[30] = 0x70003606acull; rt_dispatch(c);\n',
+  '    c->x[1] = (uint32_t)(0u | ((uint32_t)c->x[20] & (uint32_t)d3_online_status_shown()));  /* d3_gen_patch.py */\n'
+  '    c->pc = c->x[8]; c->x[30] = 0x70003606acull; rt_dispatch(c);\n',
+  'int d3_online_status_shown(void);  /* d3_gen_patch.py */\n'),
+ # 2d. pause menu entries
 ] + [
-    ('main_077.c',
-     '    c->x[30] = 0x%xull; f_700021f780(c);\n' % ret,
-     '    if (d3_options_tab_shown(3)) { c->x[30] = 0x%xull; f_700021f780(c); }  /* d3_gen_patch.py */\n' % ret,
-     'int d3_options_tab_shown(int which);  /* d3_gen_patch.py */\n')
-    for ret in (0x700021f55c, 0x700021f610, 0x700021f65c, 0x700021f6a4, 0x700021f704)
-] + [
-    # 2e. pause menu's button hint "View Online Friends" (main+0x1bb550, call returning to main+0x22120c)
-    ('main_077.c',
-     '    c->x[30] = 0x700022120cull; f_70001bb550(c);\n',
-     '    if (d3_options_tab_shown(4)) { c->x[30] = 0x700022120cull; f_70001bb550(c); }  /* d3_gen_patch.py */\n',
-     'int d3_options_tab_shown(int which);  /* d3_gen_patch.py */\n'),
-    # 4b. the end of that loop: D3_INFLATE_CHECK=1 compares the host's result with the lifted one
-    ('main_002.c',
-     '    c->sp = (uint64_t)(c->sp + 0xa0ull);\n    return;\n    rt_udf(c, 0x7000012d48ull);\n',
-     '    c->sp = (uint64_t)(c->sp + 0xa0ull);\n    d3_inflate_check(c);  /* d3_gen_patch.py */\n    return;\n'
-     '    rt_udf(c, 0x7000012d48ull);\n',
-     '_Bool d3_inflate_fast(Cpu *c); void d3_inflate_check(Cpu *c);  /* d3_gen_patch.py */\n'),
-    # 3. Options tabs (main+0x20db60 adds Gameplay, Video, Sound, Multiplayer, Controller, Privacy with main+0x210450):
-    #    Multiplayer (call returning to main+0x20e24c) and Privacy (main+0x20e26c) only when d3_options_tab_shown says so
-    ('main_076.c',
-     '    c->x[30] = 0x700020e24cull; f_7000210450(c);\n',
-     '    if (d3_options_tab_shown(1)) { c->x[30] = 0x700020e24cull; f_7000210450(c); }  /* d3_gen_patch.py */\n',
-     'int d3_options_tab_shown(int which);  /* d3_gen_patch.py */\n'),
-    ('main_076.c',
-     '    c->x[30] = 0x700020e26cull; f_7000210450(c);\n',
-     '    if (d3_options_tab_shown(2)) { c->x[30] = 0x700020e26cull; f_7000210450(c); }  /* d3_gen_patch.py */\n',
-     'int d3_options_tab_shown(int which);  /* d3_gen_patch.py */\n'),
-]
+  ('    c->x[30] = 0x%xull; f_700021f780(c);\n' % ret,
+   '    if (d3_options_tab_shown(3)) { c->x[30] = 0x%xull; f_700021f780(c); }  /* d3_gen_patch.py */\n' % ret,
+   'int d3_options_tab_shown(int which);  /* d3_gen_patch.py */\n')
+  for ret in (0x700021f55c, 0x700021f610, 0x700021f65c, 0x700021f6a4, 0x700021f704)
+ ] + [
+  # 2e. pause menu's button hint "View Online Friends"
+  ('    c->x[30] = 0x700022120cull; f_70001bb550(c);\n',
+   '    if (d3_options_tab_shown(4)) { c->x[30] = 0x700022120cull; f_70001bb550(c); }  /* d3_gen_patch.py */\n',
+   'int d3_options_tab_shown(int which);  /* d3_gen_patch.py */\n'),
+  # 4b. the end of that loop: D3_INFLATE_CHECK=1 compares the host's result with the lifted one
+  ('    c->sp = (uint64_t)(c->sp + 0xa0ull);\n    return;\n    rt_udf(c, 0x7000012d48ull);\n',
+   '    c->sp = (uint64_t)(c->sp + 0xa0ull);\n    d3_inflate_check(c);  /* d3_gen_patch.py */\n    return;\n'
+   '    rt_udf(c, 0x7000012d48ull);\n',
+   '_Bool d3_inflate_fast(Cpu *c); void d3_inflate_check(Cpu *c);  /* d3_gen_patch.py */\n'),
+  # 3. Options tabs: Multiplayer and Privacy
+  ('    c->x[30] = 0x700020e24cull; f_7000210450(c);\n',
+   '    if (d3_options_tab_shown(1)) { c->x[30] = 0x700020e24cull; f_7000210450(c); }  /* d3_gen_patch.py */\n',
+   'int d3_options_tab_shown(int which);  /* d3_gen_patch.py */\n'),
+  ('    c->x[30] = 0x700020e26cull; f_7000210450(c);\n',
+   '    if (d3_options_tab_shown(2)) { c->x[30] = 0x700020e26cull; f_7000210450(c); }  /* d3_gen_patch.py */\n',
+   'int d3_options_tab_shown(int which);  /* d3_gen_patch.py */\n'),
+ ]
 
-
-# 9. the map's button hints (main+0x3e72c0): Zoom In, Zoom Out, Recenter Map, Reset Zoom don't work in this build
-#    (none of the game's buttons changed the map in a test) - left out, d3_map_zoom_hints() (d3_menu.c) is 0 unless
-#    D3_MAP_ZOOM_HINTS=1 (the tester 2026-11-15: "remove them if you can't find what makes them work")
+# 9. the map's button hints (main+0x3e72c0)
 for _ret in ('3e747c', '3e74b0', '3e74e4', '3e7518'):
-    REPLACES.append(('main_131.c',
-        f'    c->x[30] = 0x7000{_ret}ull; f_70001bb550(c);\n',
-        f'    c->x[30] = 0x7000{_ret}ull; if (d3_map_zoom_hints()) f_70001bb550(c);  /* d3_gen_patch.py */\n',
-        'int d3_map_zoom_hints(void);  /* d3_gen_patch.py */\n'))
+ REPLACES.append((
+                  f'    c->x[30] = 0x7000{_ret}ull; f_70001bb550(c);\n',
+                  f'    c->x[30] = 0x7000{_ret}ull; if (d3_map_zoom_hints()) f_70001bb550(c);  /* d3_gen_patch.py */\n',
+                  'int d3_map_zoom_hints(void);  /* d3_gen_patch.py */\n'))
 
-# Earlier versions of a patch's text, brought up to date first (a file patched before keeps working)
+# 格式: (old_text, new_text) - Earlier versions of a patch's text, brought up to date first
 UPGRADES = [
-    ('main_117.c',
-     '    if (d3_pc_settings_entry((uint32_t)c->x[8])) goto L_7000361894;  /* d3_gen_patch.py */\n',
-     '    { int r_ = d3_pc_settings_entry((uint32_t)c->x[8]); if (r_ < 0) goto L_7000361894; c->x[8] = (uint32_t)r_; }  /* d3_gen_patch.py */\n'),
-    ('main_117.c',
-     '    if (d3_menu_hidden((uint32_t)c->x[0], (uint32_t)c->x[1])) { c->x[0] = 0; return; }  /* d3_gen_patch.py */\n',
-     '    { int h_ = d3_menu_hidden((uint32_t)c->x[0], (uint32_t)c->x[1]); if (h_) { c->x[0] = h_ == 2; return; } }  /* d3_gen_patch.py */\n'),
+ ('    if (d3_pc_settings_entry((uint32_t)c->x[8])) goto L_7000361894;  /* d3_gen_patch.py */\n',
+  '    { int r_ = d3_pc_settings_entry((uint32_t)c->x[8]); if (r_ < 0) goto L_7000361894; c->x[8] = (uint32_t)r_; }  /* d3_gen_patch.py */\n'),
+ ('    if (d3_menu_hidden((uint32_t)c->x[0], (uint32_t)c->x[1])) { c->x[0] = 0; return; }  /* d3_gen_patch.py */\n',
+  '    { int h_ = d3_menu_hidden((uint32_t)c->x[0], (uint32_t)c->x[1]); if (h_) { c->x[0] = h_ == 2; return; } }  /* d3_gen_patch.py */\n'),
 ]
 
 SEASON_DECL = 'int d3_offline_season_num(void);  /* d3_gen_patch.py */\n'
 
 SEASON_RULES = [
-    # 1. IsSignedInOnline (main+0x56b10) -> 加上 '{' 跳过前向声明
-    ('IsSignedInOnline',
-     'void f_7000056b10(Cpu *c) {',
-     r'(void f_7000056b10\(Cpu \*c\) \{\n(?:    FN_ENTER[^\n]*\n)?)',
-     r'\1    if (d3_offline_season_num() > 0) { c->x[0] = 1; return; }  /* d3_gen_patch.py */\n'),
+ # 1. IsSignedInOnline (main+0x56b10)
+ ('IsSignedInOnline',
+  'void f_7000056b10(Cpu *c) {',
+  r'(void f_7000056b10\(Cpu \*c\) \{\n(?:    FN_ENTER[^\n]*\n)?)',
+  r'\1    if (d3_offline_season_num() > 0) { c->x[0] = 1; return; }  /* d3_gen_patch.py */\n'),
 
-    # 2. ValidateHeroForPartyMember (main+0x1bf5f0) -> 加上 '{' 跳过前向声明
-    ('ValidateHeroForPartyMember',
-     'void f_70001bf5f0(Cpu *c) {',
-     r'(void f_70001bf5f0\(Cpu \*c\) \{\n(?:    FN_ENTER[^\n]*\n)?)',
-     r'\1    if (d3_offline_season_num() > 0) { c->x[0] = 0; return; }  /* d3_gen_patch.py */\n'),
+ # 2. ValidateHeroForPartyMember (main+0x1bf5f0)
+ ('ValidateHeroForPartyMember',
+  'void f_70001bf5f0(Cpu *c) {',
+  r'(void f_70001bf5f0\(Cpu \*c\) \{\n(?:    FN_ENTER[^\n]*\n)?)',
+  r'\1    if (d3_offline_season_num() > 0) { c->x[0] = 0; return; }  /* d3_gen_patch.py */\n'),
 
-    # 3. IsSeasonsInitialized (main+0x5ff0c: and w0, w8, #1)
-    ('IsSeasonsInitialized',
-     'L_700005ff0c:',
-     r'(L_700005ff0c:;\n)([^\n]+\n)',
-     r'\1    if (d3_offline_season_num() > 0) { c->x[0] = 1; } else { \2    }  /* d3_gen_patch.py */\n'),
+ # 3. IsSeasonsInitialized (main+0x5ff0c: and w0, w8, #1)
+ ('IsSeasonsInitialized',
+  'L_700005ff0c:',
+  r'(L_700005ff0c:;\n)([^\n]+\n)',
+  r'\1    if (d3_offline_season_num() > 0) { c->x[0] = 1; } else { \2    }  /* d3_gen_patch.py */\n'),
 
-    # 4. 创建赛季角色确认回调 (main+0x351ccc)
-    ('SeasonConfirmCallback',
-     'L_7000351ccc:',
-     r'(L_7000351ccc:;\n)([^\n]+\n)',
-     r'\1    if (d3_offline_season_num() > 0) { c->x[1] = 1; } else { \2    }  /* d3_gen_patch.py */\n'),
+ # 4. 创建赛季角色确认回调 (main+0x351ccc)
+ ('SeasonConfirmCallback',
+  'L_7000351ccc:',
+  r'(L_7000351ccc:;\n)([^\n]+\n)',
+  r'\1    if (d3_offline_season_num() > 0) { c->x[1] = 1; } else { \2    }  /* d3_gen_patch.py */\n'),
 
-    # 5. SetGameParamsForHero (main+0x1bd140)
-    ('SetGameParamsForHero',
-     'L_70001bd140:',
-     r'(L_70001bd140:;\n)([^\n]+\n)',
-     r'\1    if (d3_offline_season_num() > 0) { c->x[21] = (uint32_t)d3_offline_season_num(); } else { \2    }  /* d3_gen_patch.py */\n'),
+ # 5. SetGameParamsForHero (main+0x1bd140)
+ ('SetGameParamsForHero',
+  'L_70001bd140:',
+  r'(L_70001bd140:;\n)([^\n]+\n)',
+  r'\1    if (d3_offline_season_num() > 0) { c->x[21] = (uint32_t)d3_offline_season_num(); } else { \2    }  /* d3_gen_patch.py */\n'),
 
-    # 6. 赛季在线服务状态检查 (main+0x72e0a0): 离线赛季开启时返回 1 (已连接)
-    ('SeasonServiceAvailable',
-     'void f_700072e0a0(Cpu *c) {',
-     r'(void f_700072e0a0\(Cpu \*c\) \{\n(?:    FN_ENTER[^\n]*\n)?)',
-     r'\1    if (d3_offline_season_num() > 0) { c->x[0] = 1; return; }  /* d3_gen_patch.py */\n'),
+ # 6. 赛季在线服务状态检查 (main+0x72e0a0)
+ ('SeasonServiceAvailable',
+  'void f_700072e0a0(Cpu *c) {',
+  r'(void f_700072e0a0\(Cpu \*c\) \{\n(?:    FN_ENTER[^\n]*\n)?)',
+  r'\1    if (d3_offline_season_num() > 0) { c->x[0] = 1; return; }  /* d3_gen_patch.py */\n'),
 
-    # 7. GetSeasonNum (main+0x72e090): 离线赛季开启时直接返回当前设置的赛季号
-    ('GetSeasonNum',
-     'void f_700072e090(Cpu *c) {',
-     r'(void f_700072e090\(Cpu \*c\) \{\n(?:    FN_ENTER[^\n]*\n)?)',
-     r'\1    if (d3_offline_season_num() > 0) { c->x[0] = (uint32_t)d3_offline_season_num(); return; }  /* d3_gen_patch.py */\n'),
-    
-    # 8. 解锁赛季道具掉落权 - 掉落校验跳过 (main+0x492f60: B +0x14 -> L_7000492f74)
-    ('SeasonDropUnlock1',
-     'L_7000492f60:;',
-     r'(L_7000492f60:;\n)',
-     r'\1    if (d3_offline_season_num() > 0) { goto L_7000492f74; }  /* d3_gen_patch.py */\n'),
+ # 7. GetSeasonNum (main+0x72e090)
+ ('GetSeasonNum',
+  'void f_700072e090(Cpu *c) {',
+  r'(void f_700072e090\(Cpu \*c\) \{\n(?:    FN_ENTER[^\n]*\n)?)',
+  r'\1    if (d3_offline_season_num() > 0) { c->x[0] = (uint32_t)d3_offline_season_num(); return; }  /* d3_gen_patch.py */\n'),
 
-    # 9. 解锁赛季道具掉落权 - 赛季掉落资格校验直接返回 1 (main+0x897988: MOV W0,#1; B +0x68 -> L_70008979f4)
-    ('SeasonDropUnlock2',
-     'c->x[30] = 0x700089798cull; f_700050e800(c);',
-     r'(    c->x\[30\] = 0x700089798cull; f_700050e800\(c\);\n)',
-     r'    if (d3_offline_season_num() > 0) { c->x[0] = 1; goto L_70008979f4; }  /* d3_gen_patch.py */\n\1'),
+ # 8. 解锁赛季道具掉落权 - 掉落校验跳过 (main+0x492f60)
+ ('SeasonDropUnlock1',
+  'L_7000492f60:;',
+  r'(L_7000492f60:;\n)',
+  r'\1    if (d3_offline_season_num() > 0) { goto L_7000492f74; }  /* d3_gen_patch.py */\n'),
 
+ # 9. 解锁赛季道具掉落权 - 赛季掉落资格校验直接返回 1 (main+0x897988)
+ ('SeasonDropUnlock2',
+  'c->x[30] = 0x700089798cull; f_700050e800(c);',
+  r'(    c->x\[30\] = 0x700089798cull; f_700050e800\(c\);\n)',
+  r'    if (d3_offline_season_num() > 0) { c->x[0] = 1; goto L_70008979f4; }  /* d3_gen_patch.py */\n\1'),
 ]
 
-def apply_season_patches(fn, s):
-    changed = False
-    for name, probe, pat, repl in SEASON_RULES:
-        if probe not in s or f'/* d3_gen_patch.py: {name} */' in s:
-            continue
-        s_new, n = re.subn(pat, repl.replace('/* d3_gen_patch.py */', f'/* d3_gen_patch.py: {name} */'), s, count=1)
-        if n != 1:
-            idx = s.find(probe)
-            snippet = s[max(0, idx - 60):idx + 220].replace('\n', '\\n')
-            raise SystemExit(f'd3_gen_patch: {fn}: {name} matched {n} times. Context: {snippet}')
-        s = s_new
-        changed = True
-    if changed and SEASON_DECL not in s:
-        i = s.index('\n', s.index('#include "simd.h"')) + 1
-        s = s[:i] + SEASON_DECL + s[i:]
-    return s
+
+def _add_decl(s, decl):
+ if not decl or decl in s:
+  return s
+ idx = s.find('#include "simd.h"')
+ if idx != -1:
+  i = s.index('\n', idx) + 1
+  return s[:i] + decl + s[i:]
+ return s
+
+
+def apply_season_patches(fn, s, hit_stats=None):
+ changed = False
+ for idx, (name, probe, pat, repl) in enumerate(SEASON_RULES):
+  tag = f'/* d3_gen_patch.py: {name} */'
+  if tag in s:
+   if hit_stats is not None:
+    hit_stats['season'][idx] += 1
+   continue
+  if probe not in s:
+   continue
+  s_new, n = re.subn(pat, repl.replace('/* d3_gen_patch.py */', tag), s, count=1)
+  if n != 1:
+   pos = s.find(probe)
+   snippet = s[max(0, pos - 60):pos + 220].replace('\n', '\\n')
+   raise SystemExit(f'd3_gen_patch: {fn}: {name} matched {n} times. Context: {snippet}')
+  s = s_new
+  changed = True
+  if hit_stats is not None:
+   hit_stats['season'][idx] += 1
+ if changed:
+  s = _add_decl(s, SEASON_DECL)
+ return s
+
+
+def apply_text(fn, s, hit_stats=None):
+ """The patched text of any generated chunk file `fn`, matched purely by code patterns."""
+ # 1. 升级旧版本补丁
+ for old, new in UPGRADES:
+  if old in s:
+   s = s.replace(old, new)
+
+ # 2. 插入型补丁 (PATCHES)
+ for idx, (anchor, insert, decl) in enumerate(PATCHES):
+  if insert in s:
+   if hit_stats is not None:
+    hit_stats['patches'][idx] += 1
+   continue
+  if anchor not in s:
+   continue
+  if s.count(anchor) != 1:
+   raise SystemExit(f'd3_gen_patch: {fn}: anchor matched multiple times: {anchor.strip()}')
+  s = _add_decl(s.replace(anchor, anchor + insert, 1), decl)
+  if hit_stats is not None:
+   hit_stats['patches'][idx] += 1
+
+ # 3. 替换型补丁 (REPLACES)
+ for idx, (old, new, decl) in enumerate(REPLACES):
+  if new in s:
+   if hit_stats is not None:
+    hit_stats['replaces'][idx] += 1
+   continue
+  if old not in s:
+   continue
+  if s.count(old) != 1:
+   raise SystemExit(f'd3_gen_patch: {fn}: replace target matched multiple times: {old.strip()}')
+  s = _add_decl(s.replace(old, new, 1), decl)
+  if hit_stats is not None:
+   hit_stats['replaces'][idx] += 1
+
+ # 4. 赛季与金手指补丁
+ s = apply_season_patches(fn, s, hit_stats)
+ s = apply_cheat_patches(fn, s)
+ return s
 
 
 def main():
-    os.makedirs(BACKUP, exist_ok=True)
-    results = []
-    for fn, old, new in UPGRADES:
-        p = os.path.join(GEN, fn)
-        s = open(p, encoding='utf-8').read()
-        if old in s:
-            b = os.path.join(BACKUP, fn + '.orig')
-            if not os.path.exists(b):
-                shutil.copyfile(p, b)
-            open(p, 'w', encoding='utf-8', newline='\n').write(s.replace(old, new))
-            results.append((fn, 'upgraded'))
-    for fn, anchor, insert, decl in PATCHES:
-        p = os.path.join(GEN, fn)
-        s = open(p, encoding='utf-8').read()
-        if insert in s:
-            results.append((fn, 'already patched'))
-            continue
-        if s.count(anchor) != 1:
-            results.append((fn, 'NOT patched: anchor not found once'))
-            continue
-        b = os.path.join(BACKUP, fn + '.orig')
-        if not os.path.exists(b):
-            shutil.copyfile(p, b)
-        s = s.replace(anchor, anchor + insert, 1)
-        i = s.index('\n', s.index('#include "simd.h"')) + 1
-        s = s[:i] + decl + s[i:]
-        open(p, 'w', encoding='utf-8', newline='\n').write(s)
-        results.append((fn, 'patched'))
-    for fn, old, new, decl in REPLACES:
-        p = os.path.join(GEN, fn)
-        s = open(p, encoding='utf-8').read()
-        if new in s:
-            results.append((fn, 'already patched (status box)'))
-            continue
-        if s.count(old) != 1:
-            results.append((fn, 'NOT patched (status box): anchor not found once'))
-            continue
-        b = os.path.join(BACKUP, fn + '.orig')
-        if not os.path.exists(b):
-            shutil.copyfile(p, b)
-        s = s.replace(old, new, 1)
-        if decl not in s:
-            i = s.index('\n', s.index('#include "simd.h"')) + 1
-            s = s[:i] + decl + s[i:]
-        open(p, 'w', encoding='utf-8', newline='\n').write(s)
-        results.append((fn, 'patched (status box)'))
-    for fn, r in results:
-        print(f'{fn}: {r}')
-    if sys.stdin and sys.stdin.isatty():
-        try:
-            input('Press Enter to close...')
-        except EOFError:
-            pass
+ os.makedirs(BACKUP, exist_ok=True)
+ c_files = sorted(glob.glob(os.path.join(GEN, 'main_*.c')))
+ if not c_files:
+  print(f'No main_*.c files found in {GEN}')
+  return
 
+ hit_stats = {
+  'patches': [0] * len(PATCHES),
+  'replaces': [0] * len(REPLACES),
+  'season': [0] * len(SEASON_RULES),
+ }
 
-if __name__ == '__main__':
-    main()
+ modified_files = []
+ for p in c_files:
+  fn = os.path.basename(p)
+  orig_s = open(p, encoding='utf-8').read()
+  new_s = apply_text(fn, orig_s, hit_stats)
 
+  if new_s != orig_s:
+   b = os.path.join(BACKUP, fn + '.orig')
+   if not os.path.exists(b):
+    shutil.copyfile(p, b)
+   open(p, 'w', encoding='utf-8', newline='\n').write(new_s)
+   modified_files.append(fn)
+   print(f'{fn}: patched')
 
-# ---- used by tools/gen.py (and so by the game code builder on the player's PC: runtime/gamebuild.c): each generated
-# chunk of Diablo III's main program is patched as it is written, before it is compiled. Same rules as main() above.
-def apply_text(fn, s):
-    """The patched text of the generated chunk file `fn` (a base name, e.g. main_117.c)."""
-    def add_decl(s, decl):
-        if decl in s:
-            return s
-        i = s.index('\n', s.index('#include "simd.h"')) + 1
-        return s[:i] + decl + s[i:]
-    for f, old, new in UPGRADES:
-        if f == fn and old in s:
-            s = s.replace(old, new)
-    for f, anchor, insert, decl in PATCHES:
-        if f != fn or insert in s:
-            continue
-        if s.count(anchor) != 1:
-            raise SystemExit(f'd3_gen_patch: {fn}: anchor not found once')
-        s = add_decl(s.replace(anchor, anchor + insert, 1), decl)
-    for f, old, new, decl in REPLACES:
-        if f != fn or new in s:
-            continue
-        if s.count(old) != 1:
-            raise SystemExit(f'd3_gen_patch: {fn}: anchor not found once')
-        s = add_decl(s.replace(old, new, 1), decl)
-    s = apply_season_patches(fn, s)
-    s = apply_cheat_patches(fn, s)
-    return s
+ if not modified_files:
+  print('All files are already up to date.')
+ else:
+  print(f'Total files patched: {len(modified_files)}')
+
+ # 全局检查：报告在所有 main_*.c 中都未命中的规则，防止重新生成代码后静默失效
+ for idx, count in enumerate(hit_stats['patches']):
+  if count == 0:
+   print(f'WARNING: PATCHES[{idx}] did not match any file: {PATCHES[idx][0].strip()}')
+ for idx, count in enumerate(hit_stats['replaces']):
+  if count == 0:
+   first_line = REPLACES[idx][0].strip().splitlines()[0]
+   print(f'WARNING: REPLACES[{idx}] did not match any file: {first_line}')
+ for idx, count in enumerate(hit_stats['season']):
+  if count == 0:
+   print(f'WARNING: SEASON_RULES[{idx}] ({SEASON_RULES[idx][0]}) did not match any file.')
+
+ if sys.stdin and sys.stdin.isatty():
+  try:
+   input('Press Enter to close...')
+  except EOFError:
+   pass
 
 
 # ---- Local game build: auto-load cheats/*.txt next to lasrecomp.exe ----
 def _find_cheats_dir():
-    exe_dir = os.path.dirname(os.path.abspath(sys.executable))
-    candidates = [
-        os.path.join(os.getcwd(), 'cheats'),
-        os.path.join(exe_dir, 'cheats'),
-        os.path.abspath(os.path.join(exe_dir, '..', 'cheats')),
-        os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'cheats')),
-    ]
-    for d in candidates:
-        if os.path.isdir(d):
-            return d
-    return None
+ exe_dir = os.path.dirname(os.path.abspath(sys.executable))
+ candidates = [
+  os.path.join(os.getcwd(), 'cheats'),
+  os.path.join(exe_dir, 'cheats'),
+  os.path.abspath(os.path.join(exe_dir, '..', 'cheats')),
+  os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'cheats')),
+ ]
+ for d in candidates:
+  if os.path.isdir(d):
+   return d
+ return None
+
 
 def _build_cheat_table():
  cheats_dir = _find_cheats_dir()
@@ -446,8 +434,10 @@ def _build_cheat_table():
  print(f'[d3_cheats] loaded {cid} cheats from {cheats_dir}')
  return rules
 
+
 CHEAT_DECL = 'int d3_cheat_on(int id);  /* d3_gen_patch.py */\n'
 CHEAT_RULES = _build_cheat_table()
+
 
 def apply_cheat_patches(fn, s):
  if not CHEAT_RULES:
@@ -463,14 +453,20 @@ def apply_cheat_patches(fn, s):
   if m_goto and f'{m_goto.group(1)}:' not in s:
    continue
   pat = re.compile(rf'({re.escape(lbl)}\n)(.*?)(\n(?:\s*L_[0-9a-f]+:;|\}}))', re.DOTALL)
+
   def repl_fn(m):
    orig = m.group(2).strip()
    return f'{m.group(1)}    if (d3_cheat_on({cid})) {{ {c_code} }} else {{ {orig} }}  {tag}{m.group(3)}'
+
   s_new, n = pat.subn(repl_fn, s, count=1)
   if n == 1:
    s = s_new
    changed = True
- if changed and CHEAT_DECL not in s:
-  i = s.index('\n', s.index('#include "simd.h"')) + 1
-  s = s[:i] + CHEAT_DECL + s[i:]
+ if changed:
+  s = _add_decl(s, CHEAT_DECL)
  return s
+
+
+if __name__ == '__main__':
+ main()
+ 
