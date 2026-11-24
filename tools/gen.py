@@ -521,6 +521,7 @@ def write_if_changed(path, text):
 
 
 def main():
+    global D3_PATCH, HOOKS, PATCHES
     ap = argparse.ArgumentParser()
     ap.add_argument('name')
     ap.add_argument('nso')
@@ -539,20 +540,17 @@ def main():
     m = Module(args.name, args.nso, args.base, args.simd)
     d3 = args.name == 'main' and m.nso.build_id.upper().startswith(D3_MAIN_BUILD_ID)
     d3_276 = args.name == 'main' and m.nso.build_id.upper().startswith(D3_276_MAIN_BUILD_ID)
-    if d3:  # Diablo III: no Link's Awakening address table or patches; its own small ones (d3_gen_patch.py)
-        global D3_PATCH
+    if d3:  # Diablo III 2.7.7: use its own patch rules.
         version = None
         import d3_gen_patch
         D3_PATCH = d3_gen_patch
-        print(f'{args.name}: Diablo III (build {m.nso.build_id[:16]}), Diablo III patches', file=sys.stderr)
-    if d3_276:  # Diablo III: no Link's Awakening address table or patches; its own small ones (d3_gen_patch_276.py)
-        global D3_PATCH
+        print(f'{args.name}: Diablo III 2.7.7 (build {m.nso.build_id[:16]}), Diablo III patches', file=sys.stderr)
+    elif d3_276:  # Diablo III 2.7.6: use the version-specific patch rules.
         version = None
         import d3_gen_patch_276
         D3_PATCH = d3_gen_patch_276
-        print(f'{args.name}: Diablo III (build {m.nso.build_id[:16]}), Diablo III patches', file=sys.stderr)
+        print(f'{args.name}: Diablo III 2.7.6 (build {m.nso.build_id[:16]}), Diablo III patches', file=sys.stderr)
     elif args.name == 'main':
-        global HOOKS, PATCHES
         import game_addresses
         try:
             version = game_addresses.select_build_id(m.nso.build_id)
@@ -681,12 +679,13 @@ def main():
         write_if_changed(os.path.join(args.outdir, f'{args.name}_table.c'), f.getvalue())
     if d3:
         write_if_changed(os.path.join(args.outdir, 'main_build_id.txt'), D3_MAIN_BUILD_ID + '\n')
-    if d3_276:
-        write_if_changed(os.path.join(args.outdir, 'main_build_id.txt'), D3_MAIN_BUILD_ID + '\n')
-    elif args.name == 'main':  # (what this code was generated from: the Makefile's game code library id, GAMELIB_BUILD_ID)
+    elif d3_276:
+        write_if_changed(os.path.join(args.outdir, 'main_build_id.txt'), D3_276_MAIN_BUILD_ID + '\n')
+    elif args.name == 'main':  # (what this was generated from: the Makefile's GAMELIB_BUILD_ID)
         write_if_changed(os.path.join(args.outdir, 'main_build_id.txt'), game_addresses.VERSIONS[version][1] + '\n')
     print(f'{args.name}: wrote {nchunks} chunks, {time.time() - t0:.0f}s total', file=sys.stderr)
 
 
 if __name__ == '__main__':
     main()
+    
