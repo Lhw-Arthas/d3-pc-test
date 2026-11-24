@@ -272,6 +272,7 @@ dist:
 	! nm $(WIN_B)/lasrecomp.exe | grep ' f_70' >/dev/null  # (no game code inside)
 	rm -rf build/dist && mkdir -p "$(DIST)/gamelib-src"
 	cp $(WIN_B)/lasrecomp.exe $(WIN_B)/lasrecomp.dll.a "$(DIST)/"
+	$(CC) -O2 -municode tools/d3_starter.c $(WIN_B)/rt/platform/windows_rc.o -lcomctl32 -lgdi32 -Wl,--subsystem,windows -Wl,--strip-debug -o "$(DIST)/Diablo3Recomp.exe"
 	tools/zig_slim.sh $(strip $(filter-out -Iruntime,$(GENFLAGS)))  # (zig with its runtime built ahead of time)
 	cp -R build/helper/lasgen "$(DIST)/"
 	cp -R build/zig-slim "$(DIST)/zig"
