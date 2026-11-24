@@ -598,6 +598,31 @@ def main():
                 t = adrp_regs[rn][0] + ((w >> 10) & 0xFFF)
                 if m.in_text(t):
                     start_set.add(t)
+
+    # Runtime fix for Diablo III 2.7.6:
+    # the game reached 0x7000a4e050 through an indirect transfer, but that address
+    # was missing from main_fn_addrs/main_fn_ptrs. Add it as an explicit function
+    # boundary so it is emitted into the generated dispatch table.
+    # This is based on the observed runtime fatal and should be re-validated against
+    # the 2.7.6 main disassembly if the failure moves or persists.
+    if d3_276:
+        forced_offsets = (0xA4E050,)
+        for off in forced_offsets:
+            forced_addr = args.base + off
+            if m.in_text(forced_addr):
+                if forced_addr not in start_set:
+                    start_set.add(forced_addr)
+                    print(
+                        f'{args.name}: added 2.7.6 forced function boundary '
+                        f'at {forced_addr:#x} (offset {off:#x})',
+                        file=sys.stderr,
+                    )
+            else:
+                sys.exit(
+                    f'{args.name}: forced 2.7.6 function offset {off:#x} '
+                    f'is outside .text (text range {m.lo:#x}..{m.hi:#x})'
+                )
+
     scanned = {}
     rounds = 0
     while True:
