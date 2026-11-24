@@ -158,10 +158,10 @@ SEASON_RULES = [
   r'\1    if (d3_offline_season_num() > 0) { c->x[0] = 0; return; }  /* d3_gen_patch_276.py */\n'),
 
  # 3. IsSeasonsInitialized (main+0x5ff0c: and w0, w8, #1)
- ('IsSeasonsInitialized',
-  'L_700005ff0c:',
-  r'(L_700005ff0c:;\n)([^\n]+\n)',
-  r'\1    if (d3_offline_season_num() > 0) { c->x[0] = 1; } else { \2    }  /* d3_gen_patch_276.py */\n'),
+ #('IsSeasonsInitialized',
+ # 'L_700005ff0c:',
+ # r'(L_700005ff0c:;\n)([^\n]+\n)',
+ # r'\1    if (d3_offline_season_num() > 0) { c->x[0] = 1; } else { \2    }  /* d3_gen_patch_276.py */\n'),
 
  # 4. 创建赛季角色确认回调：2.7.6 的 0x351CBC 是函数 f_7000351cb0 内的条件跳转指令，
  # 生成 C 不一定会为该指令单独输出 L_7000351cbc 标签，因此按实际条件跳转语句匹配。
@@ -178,10 +178,10 @@ SEASON_RULES = [
   r'\1    if (d3_offline_season_num() > 0) { c->x[21] = (uint32_t)d3_offline_season_num(); } else { \2    }  /* d3_gen_patch_276.py */\n'),
 
  # 6. 赛季在线服务状态检查 (main+0x72dfa0)
- ('SeasonServiceAvailable',
-  'void f_700072dfa0(Cpu *c) {',
-  r'(void f_700072dfa0\(Cpu \*c\) \{\n(?:    FN_ENTER[^\n]*\n)?)',
-  r'\1    if (d3_offline_season_num() > 0) { c->x[0] = 1; return; }  /* d3_gen_patch_276.py */\n'),
+ #('SeasonServiceAvailable',
+ # 'void f_700072dfa0(Cpu *c) {',
+ # r'(void f_700072dfa0\(Cpu \*c\) \{\n(?:    FN_ENTER[^\n]*\n)?)',
+ # r'\1    if (d3_offline_season_num() > 0) { c->x[0] = 1; return; }  /* d3_gen_patch_276.py */\n'),
 
  # 7. GetSeasonNum (main+0x72df90)
  ('GetSeasonNum',
