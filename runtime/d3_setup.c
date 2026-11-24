@@ -409,10 +409,7 @@ int d3_setup_main(void) {
     }
     unpack_aoc_data(up);
     CreateDirectoryW(L"extracted", NULL);
-    bool have_game = main_is_277("extracted/exefs/main") && romfs_complete();
-    if (have_game) {
-        have_game = main_is_276("extracted/exefs/main") && romfs_complete();
-    }
+    bool have_game = (main_is_277("extracted/exefs/main") || main_is_276("extracted/exefs/main")) && romfs_complete();
     if (have_game && gamelib_present("extracted")) {
         try_pc_fonts();
         tidy_inputs(here, up);
