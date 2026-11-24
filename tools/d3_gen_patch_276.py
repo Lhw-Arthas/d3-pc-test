@@ -1,9 +1,9 @@
 """2.7.6-specific patch for generated Diablo III C code.
 Run only on freshly generated 2.7.6 code. Changed files are backed up under backups/generated (same location as the original patcher).
 Season-drop logic is mapped from the supplied 2.7.6 cheat instructions:
-0x492EF0: 0x14000005 -> B to 0x492F04
-0x897888: 0x52800020 -> MOV W0, #1
-0x89788C: 0x1400001A -> B to 0x8978F4
+  0x492EF0: 0x14000005 -> B to 0x492F04
+  0x897888: 0x52800020 -> MOV W0, #1
+  0x89788C: 0x1400001A -> B to 0x8978F4
 The source-level equivalents below activate only when d3_offline_season_num() > 0.
 Address mappings from the 2.7.7 -> 2.7.6 signature report are otherwise unchanged.
 """
@@ -163,11 +163,13 @@ SEASON_RULES = [
   r'(L_700005ff0c:;\n)([^\n]+\n)',
   r'\1    if (d3_offline_season_num() > 0) { c->x[0] = 1; } else { \2    }  /* d3_gen_patch_276.py */\n'),
 
- # 4. 创建赛季角色确认回调 (main+0x351cbc)
+ # 4. 创建赛季角色确认回调：2.7.6 的 0x351CBC 是函数 f_7000351cb0 内的条件跳转指令，
+ # 生成 C 不一定会为该指令单独输出 L_7000351cbc 标签，因此按实际条件跳转语句匹配。
+ # 赛季开启时设置 x1=1 并跳过原分支；赛季关闭时保留原始 COND_NE 分支。
  ('SeasonConfirmCallback',
-  'L_7000351cbc:',
-  r'(L_7000351cbc:;\n)([^\n]+\n)',
-  r'\1    if (d3_offline_season_num() > 0) { c->x[1] = 1; } else { \2    }  /* d3_gen_patch_276.py */\n'),
+  'void f_7000351cb0(Cpu *c) {',
+  r'(?s)(void f_7000351cb0\(Cpu \*c\) \{.*?)(?m:^(?P<indent>[ \t]*)if \(COND_NE\(c\)\) \{ goto L_7000351cec; \})',
+  r'\1\g<indent>if (d3_offline_season_num() > 0) { c->x[1] = 1; } else if (COND_NE(c)) { goto L_7000351cec; }  /* d3_gen_patch_276.py */'),
 
  # 5. SetGameParamsForHero (main+0x1bd140)
  ('SetGameParamsForHero',
