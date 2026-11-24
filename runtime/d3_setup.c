@@ -30,6 +30,7 @@
 #define D3_AOC_MASK 0xFFFFFFFFFFFFF000ull
 #define D3_AOC_TID 0x01001B300B9BF000ull
 static const char D3_BUILD_ID[] = "2607a74f5df7754cc0357b5df7e496931355d8ca";  // update 2.7.7 (v1441792)
+static const char D3_276_BUILD_ID[] = "9b9e182991f3f5b5f21746646854fa803b6d39a5";  // update 2.7.7 (v1441792)
 static const unsigned long long D3_ROMFS_BYTES = 17144415892ull;  // its merged romfs (37 files)
 
 static void out(const char *kind, const char *fmt, ...) {
@@ -195,6 +196,18 @@ static bool main_is_277(const char *exefs_main) {
     for (int i = 0; ok && i < 20; i++) sprintf(hex + 2 * i, "%02x", id[i]);
     return ok && !strcmp(hex, D3_BUILD_ID);
 }
+
+static bool main_is_276(const char *exefs_main) {
+    FILE *f = fopen(exefs_main, "rb");
+    if (!f) return false;
+    uint8_t id[20];
+    bool ok = fseek(f, 0x40, SEEK_SET) == 0 && fread(id, 1, 20, f) == 20;
+    fclose(f);
+    char hex[41];
+    for (int i = 0; ok && i < 20; i++) sprintf(hex + 2 * i, "%02x", id[i]);
+    return ok && !strcmp(hex, D3_276_BUILD_ID);
+}
+
 static bool romfs_complete(void) { return rt_tree_size("extracted/romfs") >= D3_ROMFS_BYTES; }
 
 static int g_last_prog = -1;
@@ -397,6 +410,9 @@ int d3_setup_main(void) {
     unpack_aoc_data(up);
     CreateDirectoryW(L"extracted", NULL);
     bool have_game = main_is_277("extracted/exefs/main") && romfs_complete();
+    if (have_game) {
+        have_game = main_is_276("extracted/exefs/main") && romfs_complete();
+    }
     if (have_game && gamelib_present("extracted")) {
         try_pc_fonts();
         tidy_inputs(here, up);
@@ -472,6 +488,7 @@ int d3_setup_main(void) {
             int rc = run_wait(cmd, log, NULL);
             LOG("[d3setup] exefs from update %d: exit %d\n", i, rc);
             if (main_is_277("extracted/exefs/main")) u = upd[i];
+            else if (main_is_276("extracted/exefs/main")) u = upd[i];
         }
         if (!u) {
             FILE *f = fopen("extracted/exefs/main", "rb");
