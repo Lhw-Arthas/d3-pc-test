@@ -300,27 +300,27 @@ def apply_pause_menu_patches(fn, s, hit_stats=None):
 The 2.7.7 -> 2.7.6 signature report missed some internal instructions around these calls,
 so this matches only calls to the known pause helper whose return addresses fall in 0x21f500..0x21f800.
  """
- pattern = re.compile(
-  r'^(?P<indent>[ \t]*)c->x\[30\] = (?P<lr>0x[0-9a-fA-F]+ull); f_700021f780\(c\);$',
-  re.MULTILINE)
- tag = '/* d3_gen_patch_276.py: pause tab */'
-
- def repl(m):
-  try:
-   address = int(m.group('lr')[:-3], 16)  # strip trailing 'ull'
-  except ValueError:
-   return m.group(0)
-  if not (0x700021f500 <= address <= 0x700021f800):
-   return m.group(0)
-  return (f"{m.group('indent')}if (d3_options_tab_shown(3)) {{ "
-          f"c->x[30] = {m.group('lr')}; f_700021f780(c); }}  {tag}")
-
- s, _ = pattern.subn(repl, s)
- # Count tags in this source chunk so repeat runs remain idempotent and diagnostics are meaningful.
- if hit_stats is not None:
-  hit_stats['pause_menu'] += s.count(tag)
- if tag in s:
-  s = _add_decl(s, PAUSE_TAB_DECL)
+ # pattern = re.compile(
+ #  r'^(?P<indent>[ \t]*)c->x\[30\] = (?P<lr>0x[0-9a-fA-F]+ull); f_700021f780\(c\);$',
+ #  re.MULTILINE)
+ # tag = '/* d3_gen_patch_276.py: pause tab */'
+ #
+ # def repl(m):
+ #  try:
+ #   address = int(m.group('lr')[:-3], 16)  # strip trailing 'ull'
+ #  except ValueError:
+ #   return m.group(0)
+ #  if not (0x700021f500 <= address <= 0x700021f800):
+ #   return m.group(0)
+ #  return (f"{m.group('indent')}if (d3_options_tab_shown(3)) {{ "
+ #          f"c->x[30] = {m.group('lr')}; f_700021f780(c); }}  {tag}")
+ #
+ # s, _ = pattern.subn(repl, s)
+ # # Count tags in this source chunk so repeat runs remain idempotent and diagnostics are meaningful.
+ # if hit_stats is not None:
+ #  hit_stats['pause_menu'] += s.count(tag)
+ # if tag in s:
+ #  s = _add_decl(s, PAUSE_TAB_DECL)
  return s
 
 
