@@ -203,6 +203,14 @@ SEASON_RULES = [
   'c->x[30] = 0x700089788cull; f_700050e700(c);',
   r'(    c->x\[30\] = 0x700089788cull; f_700050e700\(c\);\n)',
   r'    if (d3_offline_season_num() > 0) { c->x[0] = 1; goto L_70008978f4; }  /* d3_gen_patch_276.py */\n\1'),
+
+ # 10. GameCommonData::Initialize (main+0x4CACB8: TBZ W8, #0x12, loc_4CACCC)
+ # 开启离线赛季时跳过该条件跳转，允许离线赛季世界加载赛季主题与事件
+ ('GameCommonDataSeasonalGate',
+  'L_70004cacb8:;',
+  r'(L_70004cacb8:;\n)([^\n]+\n)',
+  r'\1    if (d3_offline_season_num() <= 0) { \2    }  /* d3_gen_patch_276.py */\n'),
+ 
 ]
 
 
