@@ -599,16 +599,16 @@ def main():
                 if m.in_text(t):
                     start_set.add(t)
 
-    # Runtime fixes for Diablo III 2.7.6:
-    # Some function pointers reach these addresses indirectly, so the ordinary
-    # boundary discovery may not add them to main_fn_addrs/main_fn_ptrs.
-    # Add the observed runtime targets as explicit function boundaries.
-    # 0xA4E050: reported by the earlier runtime fatal.
-    # 0x315E20: current runtime fatal (FATAL: no function at 7000315e20, lr=0).
-    # These are runtime-driven candidates; confirm against the 2.7.6 disassembly
-    # if another failure occurs after adding them.
+    # Runtime-observed indirect-call targets which were missing from the function table.
+    # The regular boundary scan may not discover these targets from function pointers/vtables.
+    # These are forced function-boundary candidates for Diablo III 2.7.6:
+    # 0xA4E050: earlier runtime fatal.
+    # 0x315E20: subsequent runtime fatal.
+    # 0xA273C0: latest runtime fatal (FATAL: no function at 7000a273c0, lr=0).
+    # Confirm any continued failures against the 2.7.6 disassembly; an observed
+    # dispatch target is strong evidence, but does not by itself prove a C-level function start.
     if d3_276:
-        forced_offsets = (0xA4E050, 0x315E20)
+        forced_offsets = (0xA4E050, 0x315E20, 0xA273C0)
         for off in forced_offsets:
             forced_addr = args.base + off
             if m.in_text(forced_addr):
