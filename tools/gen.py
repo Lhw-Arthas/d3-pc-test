@@ -599,14 +599,16 @@ def main():
                 if m.in_text(t):
                     start_set.add(t)
 
-    # Runtime fix for Diablo III 2.7.6:
-    # the game reached 0x7000a4e050 through an indirect transfer, but that address
-    # was missing from main_fn_addrs/main_fn_ptrs. Add it as an explicit function
-    # boundary so it is emitted into the generated dispatch table.
-    # This is based on the observed runtime fatal and should be re-validated against
-    # the 2.7.6 main disassembly if the failure moves or persists.
+    # Runtime fixes for Diablo III 2.7.6:
+    # Some function pointers reach these addresses indirectly, so the ordinary
+    # boundary discovery may not add them to main_fn_addrs/main_fn_ptrs.
+    # Add the observed runtime targets as explicit function boundaries.
+    # 0xA4E050: reported by the earlier runtime fatal.
+    # 0x315E20: current runtime fatal (FATAL: no function at 7000315e20, lr=0).
+    # These are runtime-driven candidates; confirm against the 2.7.6 disassembly
+    # if another failure occurs after adding them.
     if d3_276:
-        forced_offsets = (0xA4E050,)
+        forced_offsets = (0xA4E050, 0x315E20)
         for off in forced_offsets:
             forced_addr = args.base + off
             if m.in_text(forced_addr):
