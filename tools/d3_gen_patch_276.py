@@ -1,6 +1,11 @@
 """2.7.6-specific patch for generated Diablo III C code.
 Run only on freshly generated 2.7.6 code. Changed files are backed up under backups/generated (same location as the original patcher).
-Address mappings come from the supplied 2.7.7 -> 2.7.6 signature report; loose-only and missed sites are warned about.
+Season-drop logic is mapped from the supplied 2.7.6 cheat instructions:
+0x492EF0: 0x14000005 -> B to 0x492F04
+0x897888: 0x52800020 -> MOV W0, #1
+0x89788C: 0x1400001A -> B to 0x8978F4
+The source-level equivalents below activate only when d3_offline_season_num() > 0.
+Address mappings from the 2.7.7 -> 2.7.6 signature report are otherwise unchanged.
 """
 import os
 import glob
@@ -182,13 +187,16 @@ SEASON_RULES = [
   r'(void f_700072df90\(Cpu \*c\) \{\n(?:    FN_ENTER[^\n]*\n)?)',
   r'\1    if (d3_offline_season_num() > 0) { c->x[0] = (uint32_t)d3_offline_season_num(); return; }  /* d3_gen_patch_276.py */\n'),
 
- # 8. 解锁赛季道具掉落权 - 掉落校验跳过 (main+0x492ef0)
+ # 8. 解锁赛季道具掉落权。对应 2.7.6 金手指：0x492EF0 = 0x14000005，B 到 0x492F04。
+ # 开启离线赛季时执行同等跳转，未开启时保留原逻辑。
  ('SeasonDropUnlock1',
   'L_7000492ef0:;',
   r'(L_7000492ef0:;\n)',
   r'\1    if (d3_offline_season_num() > 0) { goto L_7000492f04; }  /* d3_gen_patch_276.py */\n'),
 
- # 9. 解锁赛季道具掉落权 - 赛季掉落资格校验直接返回 1 (main+0x897888)
+ # 9. 解锁赛季道具掉落权。对应 2.7.6 金手指：
+ #    0x897888 = 0x52800020 (MOV W0, #1)，0x89788C = 0x1400001A (B 到 0x8978F4)。
+ # 开启离线赛季时返回 1 并跳过资格检查，未开启时执行原 helper。
  ('SeasonDropUnlock2',
   'c->x[30] = 0x700089788cull; f_700050e700(c);',
   r'(    c->x\[30\] = 0x700089788cull; f_700050e700\(c\);\n)',
@@ -203,6 +211,45 @@ def _add_decl(s, decl):
  if idx != -1:
   i = s.index('\n', idx) + 1
   return s[:i] + decl + s[i:]
+ return s
+
+
+def _generated_function_region(s, pos):
+ """Return (start, end) for the generated f_<addr>(Cpu *c) containing pos."""
+ starts = list(re.finditer(r'^void f_[0-9a-fA-F]+\(Cpu \*c\) \{$', s, re.MULTILINE))
+ current = None
+ next_start = len(s)
+ for m in starts:
+  if m.start() <= pos:
+   current = m.start()
+  elif current is not None:
+   next_start = m.start()
+   break
+ if current is None:
+  return None
+ return current, next_start
+
+
+def validate_season_drop_targets(fn, s):
+ """Fail early rather than emit a C goto whose target label is missing/outside its function."""
+ checks = (
+  ('SeasonDropUnlock1', 'L_7000492ef0:;', 'L_7000492f04:;'),
+  ('SeasonDropUnlock2', 'c->x[30] = 0x700089788cull; f_700050e700(c);', 'L_70008978f4:;'),
+ )
+ for name, source_probe, target_label in checks:
+  tag = f'/* d3_gen_patch_276.py: {name} */'
+  if tag not in s:
+   continue
+  pos = s.find(tag)
+  region = _generated_function_region(s, pos)
+  if region is None:
+   raise SystemExit(f'd3_gen_patch_276: {fn}: {name}: cannot determine generated function containing patch')
+  start, end = region
+  if target_label not in s[start:end]:
+   raise SystemExit(
+    f'd3_gen_patch_276: {fn}: {name}: target label {target_label} is missing from the same generated function. '
+    'Do not compile this output yet; the generator may need to emit this branch target as a label.'
+   )
  return s
 
 
@@ -227,6 +274,8 @@ def apply_season_patches(fn, s, hit_stats=None):
    hit_stats['season'][idx] += 1
  if changed:
   s = _add_decl(s, SEASON_DECL)
+ # The cheat-derived branches must land on labels within the same generated function.
+ s = validate_season_drop_targets(fn, s)
  return s
 
 
@@ -395,6 +444,11 @@ def main():
  for idx, count in enumerate(hit_stats['season']):
   if count == 0:
    print(f'WARNING: SEASON_RULES[{idx}] ({SEASON_RULES[idx][0]}) did not match any file.')
+ # SEASON_RULES indices 7 and 8 are the two cheat-derived season-drop patches.
+ for idx in (7, 8):
+  status = 'matched' if hit_stats['season'][idx] else 'NOT MATCHED'
+  print(f"[season-drop] {SEASON_RULES[idx][0]}: {status}; source cheat offset(s): "
+        + ('0x492EF0 -> 0x492F04' if idx == 7 else '0x897888 / 0x89788C -> 0x8978F4'))
  if hit_stats['pause_menu'] != 5:
   print(f"WARNING: pause-menu semantic patch matched {hit_stats['pause_menu']} call(s); expected 5. Verify the 2.7.6 generated C.")
  if hit_stats['map_hints'] != 4:
@@ -537,3 +591,4 @@ def apply_cheat_patches(fn, s):
 
 if __name__ == '__main__':
  main()
+ 
