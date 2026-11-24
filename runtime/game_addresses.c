@@ -1,6 +1,7 @@
 // The game-address tables of every supported game version and their selection by build ID (game_addresses.h).
 #include "game_addresses.h"
 
+#include <cstddef>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -33,6 +34,8 @@ static GameAddrs ga_d3_zero;
 static uint8_t ga_d3_scratch[1 << 20] __attribute__((aligned(4096)));
 static const GameVersion d3_version = {"d3_2_7_7", "Diablo III 2.7.7", "2607A74F5DF7754CC0357B5DF7E496931355D8CA",
                                        &ga_d3_zero};
+static const GameVersion d3_version_276 = {"d3_2_7_6", "Diablo III 2.7.6", "9B9E182991F3F5B5F21746646854FA803B6D39A5",
+                                       &ga_d3_zero};
 bool game_is_d3(void) { return g_ga == &ga_d3_zero; }
 
 const GameAddrs *g_ga;
@@ -50,7 +53,15 @@ const GameVersion *game_version_by_build_id(const uint8_t id[20]) {
     const char *h = d3_version.build_id;
     int k = 0;
     while (k < 20 && id[k] == (uint8_t)(hexval(h[2 * k]) << 4 | hexval(h[2 * k + 1]))) k++;
-    return k == 20 ? &d3_version : NULL;
+    const GameVersion *g = k == 20 ? &d3_version : NULL;
+    if (g == NULL) {
+        const char *h = d3_version_276.build_id;
+        int k = 0;
+        while (k < 20 && id[k] == (uint8_t)(hexval(h[2 * k]) << 4 | hexval(h[2 * k + 1]))) k++;
+        g = k == 20 ? &d3_version_276 : NULL;
+        return g;
+    }
+    return g;
 }
 
 // The main program's build ID (0x40 in the file). false: missing or not a program.
